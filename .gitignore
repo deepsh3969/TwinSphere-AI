@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+dist/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+*.local
+
+# Databases (runtime artifacts)
+backend/*.db
+backend/test_*.db
+database/*.db
+database/*.sqlite*
+
+# AI model artifacts (Phase 5 — retrained at runtime)
+ai/models/
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

@@ -1,0 +1,2038 @@
+{
+  "buildings": [
+    {
+      "id": "admin",
+      "code": "ADMIN-A",
+      "name": "Administration Block",
+      "type": "ADMIN",
+      "description": "Central administration, registry and council chambers.",
+      "capacity": 420,
+      "occupancy": 268,
+      "floors": 3,
+      "position_x": -50,
+      "position_z": -35,
+      "size_x": 40,
+      "size_z": 24,
+      "height": 12,
+      "latitude": 6.52435,
+      "longitude": 3.37918,
+      "color": "#4f7cff",
+      "has_backup_power": true
+    },
+    {
+      "id": "eng",
+      "code": "ENG-B",
+      "name": "Engineering Building",
+      "type": "ACADEMIC",
+      "description": "Teaching labs, lecture halls and faculty offices for engineering.",
+      "capacity": 1200,
+      "occupancy": 840,
+      "floors": 4,
+      "position_x": 0,
+      "position_z": -38,
+      "size_x": 50,
+      "size_z": 28,
+      "height": 16,
+      "latitude": 6.52461,
+      "longitude": 3.37945,
+      "color": "#f59e0b",
+      "has_backup_power": true
+    },
+    {
+      "id": "cs",
+      "code": "CS-C",
+      "name": "Computer Science Building",
+      "type": "ACADEMIC",
+      "description": "Computing labs, lecture theatre and the campus server room.",
+      "capacity": 900,
+      "occupancy": 610,
+      "floors": 3,
+      "position_x": 55,
+      "position_z": -32,
+      "size_x": 34,
+      "size_z": 24,
+      "height": 12,
+      "latitude": 6.52448,
+      "longitude": 3.37981,
+      "color": "#14b8a6",
+      "has_backup_power": true
+    },
+    {
+      "id": "lib",
+      "code": "LIB-D",
+      "name": "Central Library",
+      "type": "LIBRARY",
+      "description": "Reading halls, periodicals archive and study spaces.",
+      "capacity": 800,
+      "occupancy": 512,
+      "floors": 3,
+      "position_x": -50,
+      "position_z": 18,
+      "size_x": 40,
+      "size_z": 28,
+      "height": 13,
+      "latitude": 6.52411,
+      "longitude": 3.37912,
+      "color": "#8b5cf6",
+      "has_backup_power": false
+    },
+    {
+      "id": "canteen",
+      "code": "CAN-E",
+      "name": "Canteen & Dining Hall",
+      "type": "AMENITY",
+      "description": "Dining hall, kitchen and dry storage for campus catering.",
+      "capacity": 500,
+      "occupancy": 305,
+      "floors": 1,
+      "position_x": 0,
+      "position_z": 32,
+      "size_x": 36,
+      "size_z": 20,
+      "height": 6,
+      "latitude": 6.52398,
+      "longitude": 3.37936,
+      "color": "#ec4899",
+      "has_backup_power": false
+    },
+    {
+      "id": "clinic",
+      "code": "CLI-F",
+      "name": "Campus Clinic",
+      "type": "MEDICAL",
+      "description": "Outpatient clinic with triage, treatment rooms and pharmacy.",
+      "capacity": 120,
+      "occupancy": 44,
+      "floors": 1,
+      "position_x": 52,
+      "position_z": 20,
+      "size_x": 26,
+      "size_z": 18,
+      "height": 6,
+      "latitude": 6.52404,
+      "longitude": 3.37974,
+      "color": "#22c55e",
+      "has_backup_power": true
+    }
+  ],
+  "floors": [
+    {
+      "id": "ADMIN-A-F1",
+      "building_id": "admin",
+      "floor_number": 1,
+      "name": "Ground Floor",
+      "zone_count": 2,
+      "area_sqm": 320.0,
+      "is_evacuation_level": true
+    },
+    {
+      "id": "ADMIN-A-F2",
+      "building_id": "admin",
+      "floor_number": 2,
+      "name": "Floor 2",
+      "zone_count": 2,
+      "area_sqm": 320.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "ADMIN-A-F3",
+      "building_id": "admin",
+      "floor_number": 3,
+      "name": "Floor 3",
+      "zone_count": 1,
+      "area_sqm": 320.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "ENG-B-F1",
+      "building_id": "eng",
+      "floor_number": 1,
+      "name": "Ground Floor",
+      "zone_count": 4,
+      "area_sqm": 350.0,
+      "is_evacuation_level": true
+    },
+    {
+      "id": "ENG-B-F2",
+      "building_id": "eng",
+      "floor_number": 2,
+      "name": "Floor 2",
+      "zone_count": 2,
+      "area_sqm": 350.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "ENG-B-F3",
+      "building_id": "eng",
+      "floor_number": 3,
+      "name": "Floor 3",
+      "zone_count": 1,
+      "area_sqm": 350.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "ENG-B-F4",
+      "building_id": "eng",
+      "floor_number": 4,
+      "name": "Floor 4",
+      "zone_count": 1,
+      "area_sqm": 350.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "CS-C-F1",
+      "building_id": "cs",
+      "floor_number": 1,
+      "name": "Ground Floor",
+      "zone_count": 3,
+      "area_sqm": 272.0,
+      "is_evacuation_level": true
+    },
+    {
+      "id": "CS-C-F2",
+      "building_id": "cs",
+      "floor_number": 2,
+      "name": "Floor 2",
+      "zone_count": 2,
+      "area_sqm": 272.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "CS-C-F3",
+      "building_id": "cs",
+      "floor_number": 3,
+      "name": "Floor 3",
+      "zone_count": 0,
+      "area_sqm": 272.0,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "LIB-D-F1",
+      "building_id": "lib",
+      "floor_number": 1,
+      "name": "Ground Floor",
+      "zone_count": 2,
+      "area_sqm": 373.3,
+      "is_evacuation_level": true
+    },
+    {
+      "id": "LIB-D-F2",
+      "building_id": "lib",
+      "floor_number": 2,
+      "name": "Floor 2",
+      "zone_count": 2,
+      "area_sqm": 373.3,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "LIB-D-F3",
+      "building_id": "lib",
+      "floor_number": 3,
+      "name": "Floor 3",
+      "zone_count": 1,
+      "area_sqm": 373.3,
+      "is_evacuation_level": false
+    },
+    {
+      "id": "CAN-E-F1",
+      "building_id": "canteen",
+      "floor_number": 1,
+      "name": "Ground Floor",
+      "zone_count": 3,
+      "area_sqm": 720.0,
+      "is_evacuation_level": true
+    },
+    {
+      "id": "CLI-F-F1",
+      "building_id": "clinic",
+      "floor_number": 1,
+      "name": "Ground Floor",
+      "zone_count": 3,
+      "area_sqm": 468.0,
+      "is_evacuation_level": true
+    }
+  ],
+  "zones": {
+    "eng": [
+      [
+        "eng_ground",
+        "Ground Floor Lobby",
+        0,
+        160,
+        "LOBBY",
+        [
+          0,
+          "eng_electronics"
+        ],
+        [
+          0,
+          "eng_lecture"
+        ],
+        [
+          0,
+          "eng_stair"
+        ]
+      ],
+      [
+        "eng_electronics",
+        "Electronics Lab",
+        0,
+        90,
+        "LAB",
+        [
+          0,
+          "eng_ground"
+        ],
+        [
+          0,
+          "eng_exit_s"
+        ]
+      ],
+      [
+        "eng_lecture",
+        "Lecture Hall A",
+        0,
+        260,
+        "LECTURE",
+        [
+          0,
+          "eng_ground"
+        ],
+        [
+          0,
+          "eng_stair"
+        ]
+      ],
+      [
+        "eng_computer",
+        "Computer Lab",
+        1,
+        220,
+        "LAB",
+        [
+          1,
+          "eng_stair"
+        ],
+        [
+          1,
+          "eng_faculty"
+        ],
+        [
+          1,
+          "eng_exit_n"
+        ]
+      ],
+      [
+        "eng_faculty",
+        "Faculty Area",
+        2,
+        110,
+        "OFFICE",
+        [
+          2,
+          "eng_stair"
+        ],
+        [
+          2,
+          "eng_computer"
+        ]
+      ],
+      [
+        "eng_stair",
+        "Central Stairwell",
+        1,
+        80,
+        "CORE",
+        [
+          0,
+          "eng_ground"
+        ],
+        [
+          0,
+          "eng_lecture"
+        ],
+        [
+          1,
+          "eng_computer"
+        ],
+        [
+          2,
+          "eng_faculty"
+        ],
+        [
+          3,
+          "eng_exit_n"
+        ]
+      ],
+      [
+        "eng_exit_s",
+        "Emergency Exit South",
+        0,
+        120,
+        "EXIT",
+        [
+          0,
+          "eng_electronics"
+        ]
+      ],
+      [
+        "eng_exit_n",
+        "Emergency Exit North",
+        3,
+        120,
+        "EXIT",
+        [
+          1,
+          "eng_computer"
+        ],
+        [
+          3,
+          "eng_stair"
+        ]
+      ]
+    ],
+    "admin": [
+      [
+        "admin_ground",
+        "Reception & Lobby",
+        0,
+        120,
+        "LOBBY",
+        [
+          0,
+          "admin_offices"
+        ],
+        [
+          0,
+          "admin_stair"
+        ],
+        [
+          0,
+          "admin_exit"
+        ]
+      ],
+      [
+        "admin_offices",
+        "Administrative Offices",
+        1,
+        180,
+        "OFFICE",
+        [
+          1,
+          "admin_stair"
+        ],
+        [
+          1,
+          "admin_council"
+        ]
+      ],
+      [
+        "admin_council",
+        "Council Chamber",
+        2,
+        90,
+        "LECTURE",
+        [
+          2,
+          "admin_stair"
+        ]
+      ],
+      [
+        "admin_stair",
+        "Stairwell",
+        1,
+        60,
+        "CORE",
+        [
+          0,
+          "admin_ground"
+        ],
+        [
+          1,
+          "admin_offices"
+        ],
+        [
+          2,
+          "admin_council"
+        ]
+      ],
+      [
+        "admin_exit",
+        "Emergency Exit",
+        0,
+        100,
+        "EXIT",
+        [
+          0,
+          "admin_ground"
+        ]
+      ]
+    ],
+    "cs": [
+      [
+        "cs_ground",
+        "Ground Floor Lobby",
+        0,
+        140,
+        "LOBBY",
+        [
+          0,
+          "cs_lab"
+        ],
+        [
+          0,
+          "cs_stair"
+        ],
+        [
+          0,
+          "cs_exit"
+        ]
+      ],
+      [
+        "cs_lab",
+        "Computing Lab",
+        1,
+        240,
+        "LAB",
+        [
+          1,
+          "cs_stair"
+        ],
+        [
+          1,
+          "cs_lecture"
+        ]
+      ],
+      [
+        "cs_lecture",
+        "Lecture Theatre B",
+        0,
+        200,
+        "LECTURE",
+        [
+          0,
+          "cs_ground"
+        ],
+        [
+          1,
+          "cs_lab"
+        ]
+      ],
+      [
+        "cs_stair",
+        "Stairwell",
+        1,
+        60,
+        "CORE",
+        [
+          0,
+          "cs_ground"
+        ],
+        [
+          1,
+          "cs_lab"
+        ]
+      ],
+      [
+        "cs_exit",
+        "Emergency Exit",
+        0,
+        100,
+        "EXIT",
+        [
+          0,
+          "cs_ground"
+        ]
+      ]
+    ],
+    "lib": [
+      [
+        "lib_ground",
+        "Circulation Desk",
+        0,
+        150,
+        "LOBBY",
+        [
+          0,
+          "lib_reading"
+        ],
+        [
+          0,
+          "lib_stair"
+        ],
+        [
+          0,
+          "lib_exit"
+        ]
+      ],
+      [
+        "lib_reading",
+        "Reading Hall",
+        1,
+        300,
+        "STUDY",
+        [
+          1,
+          "lib_stair"
+        ],
+        [
+          1,
+          "lib_archive"
+        ]
+      ],
+      [
+        "lib_archive",
+        "Archive & Periodicals",
+        2,
+        120,
+        "STUDY",
+        [
+          2,
+          "lib_stair"
+        ]
+      ],
+      [
+        "lib_stair",
+        "Stairwell",
+        1,
+        60,
+        "CORE",
+        [
+          0,
+          "lib_ground"
+        ],
+        [
+          1,
+          "lib_reading"
+        ],
+        [
+          2,
+          "lib_archive"
+        ]
+      ],
+      [
+        "lib_exit",
+        "Emergency Exit",
+        0,
+        100,
+        "EXIT",
+        [
+          0,
+          "lib_ground"
+        ]
+      ]
+    ],
+    "canteen": [
+      [
+        "canteen_dining",
+        "Dining Hall",
+        0,
+        340,
+        "DINING",
+        [
+          0,
+          "canteen_kitchen"
+        ],
+        [
+          0,
+          "canteen_exit"
+        ]
+      ],
+      [
+        "canteen_kitchen",
+        "Kitchen & Storage",
+        0,
+        80,
+        "SERVICE",
+        [
+          0,
+          "canteen_dining"
+        ]
+      ],
+      [
+        "canteen_exit",
+        "Emergency Exit",
+        0,
+        120,
+        "EXIT",
+        [
+          0,
+          "canteen_dining"
+        ]
+      ]
+    ],
+    "clinic": [
+      [
+        "clinic_reception",
+        "Reception",
+        0,
+        50,
+        "LOBBY",
+        [
+          0,
+          "clinic_triage"
+        ],
+        [
+          0,
+          "clinic_exit"
+        ]
+      ],
+      [
+        "clinic_triage",
+        "Treatment Rooms",
+        0,
+        50,
+        "MEDICAL",
+        [
+          0,
+          "clinic_reception"
+        ]
+      ],
+      [
+        "clinic_exit",
+        "Emergency Exit",
+        0,
+        40,
+        "EXIT",
+        [
+          0,
+          "clinic_reception"
+        ]
+      ]
+    ]
+  },
+  "road_nodes": [
+    {
+      "id": "ring_sw",
+      "name": "SW Junction",
+      "x": -78,
+      "z": 52,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_s_mid",
+      "name": "South Gate Junction",
+      "x": 0,
+      "z": 52,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_s2",
+      "name": "Parking Junction",
+      "x": 60,
+      "z": 52,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_se",
+      "name": "SE Junction",
+      "x": 78,
+      "z": 52,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "road_w2",
+      "name": "West Road South",
+      "x": -78,
+      "z": 30,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "mid_w",
+      "name": "West Mid Junction",
+      "x": -78,
+      "z": 0,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "road_wn",
+      "name": "West Road North",
+      "x": -78,
+      "z": -35,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_nw",
+      "name": "NW Junction",
+      "x": -78,
+      "z": -60,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "road_s2",
+      "name": "South Road West",
+      "x": -27,
+      "z": 52,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "court_w",
+      "name": "Courtyard West",
+      "x": -27,
+      "z": 0,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "court_wn",
+      "name": "Courtyard West North",
+      "x": -27,
+      "z": -35,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_n2",
+      "name": "North Road West",
+      "x": -27,
+      "z": -60,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "court_c",
+      "name": "Courtyard Center",
+      "x": 0,
+      "z": 0,
+      "kind": "COURTYARD"
+    },
+    {
+      "id": "court_cn",
+      "name": "Courtyard North",
+      "x": 0,
+      "z": -60,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "road_s3",
+      "name": "South Road East",
+      "x": 27,
+      "z": 52,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "court_e",
+      "name": "Courtyard East",
+      "x": 27,
+      "z": 0,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "court_en",
+      "name": "Courtyard East North",
+      "x": 27,
+      "z": -35,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_n3",
+      "name": "North Road East",
+      "x": 27,
+      "z": -60,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "road_e2",
+      "name": "East Road South",
+      "x": 78,
+      "z": 30,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "mid_e",
+      "name": "East Mid Junction",
+      "x": 78,
+      "z": 0,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "road_en",
+      "name": "East Road North",
+      "x": 78,
+      "z": -35,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "ring_ne",
+      "name": "NE Junction",
+      "x": 78,
+      "z": -60,
+      "kind": "JUNCTION"
+    },
+    {
+      "id": "gate_main",
+      "name": "Main Gate (Gate A)",
+      "x": 0,
+      "z": 68,
+      "kind": "GATE",
+      "is_exit": true,
+      "exit_capacity": 1.6
+    },
+    {
+      "id": "gate_east",
+      "name": "Emergency Gate (Gate C)",
+      "x": 90,
+      "z": 0,
+      "kind": "GATE",
+      "is_exit": true,
+      "exit_capacity": 1.2
+    },
+    {
+      "id": "gate_west",
+      "name": "Emergency Gate (Gate B)",
+      "x": -90,
+      "z": 0,
+      "kind": "GATE",
+      "is_exit": true,
+      "exit_capacity": 1.0
+    },
+    {
+      "id": "ex_admin",
+      "name": "Admin East Exit",
+      "x": -29,
+      "z": -35,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_admin_w",
+      "name": "Admin West Exit",
+      "x": -70,
+      "z": -35,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_eng_s",
+      "name": "Engineering South Exit",
+      "x": 0,
+      "z": -24,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_eng_n",
+      "name": "Engineering North Exit",
+      "x": 0,
+      "z": -54,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_cs",
+      "name": "CS West Exit",
+      "x": 38,
+      "z": -32,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_lib",
+      "name": "Library East Exit",
+      "x": -29,
+      "z": 18,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_canteen_s",
+      "name": "Canteen South Exit",
+      "x": 0,
+      "z": 42,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_canteen_n",
+      "name": "Canteen North Exit",
+      "x": 0,
+      "z": 22,
+      "kind": "EXIT"
+    },
+    {
+      "id": "ex_clinic",
+      "name": "Clinic West Exit",
+      "x": 38,
+      "z": 20,
+      "kind": "EXIT"
+    },
+    {
+      "id": "node_parking",
+      "name": "Parking Bay",
+      "x": 60,
+      "z": 45,
+      "kind": "PARKING"
+    }
+  ],
+  "roads": [
+    {
+      "id": "r_sw_s2",
+      "name": "South Ring Road (W)",
+      "from_node": "ring_sw",
+      "to_node": "road_s2",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_s2_gate",
+      "name": "South Ring Road (Gate)",
+      "from_node": "road_s2",
+      "to_node": "ring_s_mid",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_gate_s3",
+      "name": "South Ring Road (Gate E)",
+      "from_node": "ring_s_mid",
+      "to_node": "road_s3",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_s3_s2p",
+      "name": "South Ring Road (Parking)",
+      "from_node": "road_s3",
+      "to_node": "ring_s2",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_s2p_se",
+      "name": "South Ring Road (E)",
+      "from_node": "ring_s2",
+      "to_node": "ring_se",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_w_s2",
+      "name": "West Ring Road (S)",
+      "from_node": "ring_sw",
+      "to_node": "road_w2",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_w2_mid",
+      "name": "West Ring Road",
+      "from_node": "road_w2",
+      "to_node": "mid_w",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_mid_wn",
+      "name": "West Ring Road (N)",
+      "from_node": "mid_w",
+      "to_node": "road_wn",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_wn_nw",
+      "name": "West Ring Road (NW)",
+      "from_node": "road_wn",
+      "to_node": "ring_nw",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_e_s2",
+      "name": "East Ring Road (S)",
+      "from_node": "ring_se",
+      "to_node": "road_e2",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_e2_mid",
+      "name": "East Ring Road",
+      "from_node": "road_e2",
+      "to_node": "mid_e",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_mid_en",
+      "name": "East Ring Road (N)",
+      "from_node": "mid_e",
+      "to_node": "road_en",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_en_ne",
+      "name": "East Ring Road (NE)",
+      "from_node": "road_en",
+      "to_node": "ring_ne",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_nw_n2",
+      "name": "North Ring Road (W)",
+      "from_node": "ring_nw",
+      "to_node": "ring_n2",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_n2_cn",
+      "name": "North Ring Road (Gate N)",
+      "from_node": "ring_n2",
+      "to_node": "court_cn",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cn_n3",
+      "name": "North Ring Road (Gate N E)",
+      "from_node": "court_cn",
+      "to_node": "ring_n3",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_n3_ne",
+      "name": "North Ring Road (E)",
+      "from_node": "ring_n3",
+      "to_node": "ring_ne",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_mid_w_cw",
+      "name": "Courtyard Road (W)",
+      "from_node": "mid_w",
+      "to_node": "court_w",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cw_cc",
+      "name": "Courtyard Road (SW)",
+      "from_node": "court_w",
+      "to_node": "court_c",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cc_ce",
+      "name": "Courtyard Road (SE)",
+      "from_node": "court_c",
+      "to_node": "court_e",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_ce_me",
+      "name": "Courtyard Road (E)",
+      "from_node": "court_e",
+      "to_node": "mid_e",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_s2_cw",
+      "name": "West Connector North",
+      "from_node": "road_s2",
+      "to_node": "court_w",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cw_wn",
+      "name": "West Connector Upper",
+      "from_node": "court_w",
+      "to_node": "court_wn",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_wn_n2",
+      "name": "West Connector North Exit",
+      "from_node": "court_wn",
+      "to_node": "ring_n2",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_s3_ce",
+      "name": "East Connector North",
+      "from_node": "road_s3",
+      "to_node": "court_e",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_ce_en",
+      "name": "East Connector Upper",
+      "from_node": "court_e",
+      "to_node": "court_en",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_en_n3",
+      "name": "East Connector North Exit",
+      "from_node": "court_en",
+      "to_node": "ring_n3",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_gate_spur",
+      "name": "Main Gate Approach",
+      "from_node": "gate_main",
+      "to_node": "ring_s_mid",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_gate_e",
+      "name": "East Emergency Gate Approach",
+      "from_node": "gate_east",
+      "to_node": "mid_e",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_gate_w",
+      "name": "West Emergency Gate Approach",
+      "from_node": "gate_west",
+      "to_node": "mid_w",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_admin_e",
+      "name": "Admin East Access",
+      "from_node": "ex_admin",
+      "to_node": "court_wn",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_admin_w",
+      "name": "Admin West Access",
+      "from_node": "ex_admin_w",
+      "to_node": "road_wn",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_eng_s",
+      "name": "Engineering South Access",
+      "from_node": "ex_eng_s",
+      "to_node": "court_c",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_eng_n",
+      "name": "Engineering North Access",
+      "from_node": "ex_eng_n",
+      "to_node": "court_cn",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cs_w",
+      "name": "CS West Access",
+      "from_node": "ex_cs",
+      "to_node": "court_en",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_lib_e",
+      "name": "Library East Access",
+      "from_node": "ex_lib",
+      "to_node": "court_w",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cant_s",
+      "name": "Canteen South Access",
+      "from_node": "ex_canteen_s",
+      "to_node": "ring_s_mid",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_cant_n",
+      "name": "Canteen North Access",
+      "from_node": "ex_canteen_n",
+      "to_node": "court_c",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_clinic_w",
+      "name": "Clinic West Access",
+      "from_node": "ex_clinic",
+      "to_node": "court_e",
+      "kind": "INTERNAL"
+    },
+    {
+      "id": "r_parking",
+      "name": "Parking Access",
+      "from_node": "node_parking",
+      "to_node": "ring_s2",
+      "kind": "INTERNAL"
+    }
+  ],
+  "sensors": [
+    {
+      "id": "occupancy_admin",
+      "sensor_code": "ADMIN-A-OCC-06",
+      "name": "OCC-Administration Block",
+      "type": "occupancy",
+      "building_id": "admin",
+      "zone_id": "admin_ground",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": -62.0,
+      "y": 1.8,
+      "z": -39.8,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "temperature_admin",
+      "sensor_code": "ADMIN-A-TEMP-01",
+      "name": "TEMP-Administration Block",
+      "type": "temperature",
+      "building_id": "admin",
+      "zone_id": "admin_offices",
+      "unit": "\u00b0C",
+      "status": "ONLINE",
+      "x": -50.0,
+      "y": 1.8,
+      "z": -39.8,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    },
+    {
+      "id": "energy_admin",
+      "sensor_code": "ADMIN-A-PWR-03",
+      "name": "PWR-Administration Block",
+      "type": "energy",
+      "building_id": "admin",
+      "zone_id": "admin_council",
+      "unit": "kW",
+      "status": "ONLINE",
+      "x": -38.0,
+      "y": 1.8,
+      "z": -39.8,
+      "min_value": 0.0,
+      "max_value": 400.0,
+      "normal_min": 0.0,
+      "normal_max": 300.0,
+      "healthy": true
+    },
+    {
+      "id": "smoke_admin",
+      "sensor_code": "ADMIN-A-SMK-04",
+      "name": "SMK-Administration Block",
+      "type": "smoke",
+      "building_id": "admin",
+      "zone_id": "admin_stair",
+      "unit": "ppm",
+      "status": "ONLINE",
+      "x": -62.0,
+      "y": 1.8,
+      "z": -30.2,
+      "min_value": 0.0,
+      "max_value": 500.0,
+      "normal_min": 0.0,
+      "normal_max": 10.0,
+      "healthy": true
+    },
+    {
+      "id": "air_quality_admin",
+      "sensor_code": "ADMIN-A-AQI-05",
+      "name": "AQI-Administration Block",
+      "type": "air_quality",
+      "building_id": "admin",
+      "zone_id": "admin_ground",
+      "unit": "AQI",
+      "status": "ONLINE",
+      "x": -50.0,
+      "y": 1.8,
+      "z": -30.2,
+      "min_value": 0.0,
+      "max_value": 300.0,
+      "normal_min": 0.0,
+      "normal_max": 100.0,
+      "healthy": true
+    },
+    {
+      "id": "humidity_admin",
+      "sensor_code": "ADMIN-A-HUM-02",
+      "name": "HUM-Administration Block",
+      "type": "humidity",
+      "building_id": "admin",
+      "zone_id": "admin_offices",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": -38.0,
+      "y": 1.8,
+      "z": -30.2,
+      "min_value": 15.0,
+      "max_value": 95.0,
+      "normal_min": 30.0,
+      "normal_max": 70.0,
+      "healthy": true
+    },
+    {
+      "id": "occupancy_eng",
+      "sensor_code": "ENG-B-OCC-06",
+      "name": "OCC-Engineering Building",
+      "type": "occupancy",
+      "building_id": "eng",
+      "zone_id": "eng_ground",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": -15.0,
+      "y": 2.4,
+      "z": -43.6,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "temperature_eng",
+      "sensor_code": "ENG-B-TEMP-01",
+      "name": "TEMP-Engineering Building",
+      "type": "temperature",
+      "building_id": "eng",
+      "zone_id": "eng_electronics",
+      "unit": "\u00b0C",
+      "status": "ONLINE",
+      "x": 0.0,
+      "y": 2.4,
+      "z": -43.6,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    },
+    {
+      "id": "energy_eng",
+      "sensor_code": "ENG-B-PWR-03",
+      "name": "PWR-Engineering Building",
+      "type": "energy",
+      "building_id": "eng",
+      "zone_id": "eng_lecture",
+      "unit": "kW",
+      "status": "ONLINE",
+      "x": 15.0,
+      "y": 2.4,
+      "z": -43.6,
+      "min_value": 0.0,
+      "max_value": 400.0,
+      "normal_min": 0.0,
+      "normal_max": 300.0,
+      "healthy": true
+    },
+    {
+      "id": "smoke_eng",
+      "sensor_code": "ENG-B-SMK-04",
+      "name": "SMK-Engineering Building",
+      "type": "smoke",
+      "building_id": "eng",
+      "zone_id": "eng_computer",
+      "unit": "ppm",
+      "status": "ONLINE",
+      "x": -15.0,
+      "y": 2.4,
+      "z": -32.4,
+      "min_value": 0.0,
+      "max_value": 500.0,
+      "normal_min": 0.0,
+      "normal_max": 10.0,
+      "healthy": true
+    },
+    {
+      "id": "air_quality_eng",
+      "sensor_code": "ENG-B-AQI-05",
+      "name": "AQI-Engineering Building",
+      "type": "air_quality",
+      "building_id": "eng",
+      "zone_id": "eng_faculty",
+      "unit": "AQI",
+      "status": "ONLINE",
+      "x": 0.0,
+      "y": 2.4,
+      "z": -32.4,
+      "min_value": 0.0,
+      "max_value": 300.0,
+      "normal_min": 0.0,
+      "normal_max": 100.0,
+      "healthy": true
+    },
+    {
+      "id": "humidity_eng",
+      "sensor_code": "ENG-B-HUM-02",
+      "name": "HUM-Engineering Building",
+      "type": "humidity",
+      "building_id": "eng",
+      "zone_id": "eng_stair",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": 15.0,
+      "y": 2.4,
+      "z": -32.4,
+      "min_value": 15.0,
+      "max_value": 95.0,
+      "normal_min": 30.0,
+      "normal_max": 70.0,
+      "healthy": true
+    },
+    {
+      "id": "occupancy_cs",
+      "sensor_code": "CS-C-OCC-06",
+      "name": "OCC-Computer Science Building",
+      "type": "occupancy",
+      "building_id": "cs",
+      "zone_id": "cs_ground",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": 44.8,
+      "y": 1.8,
+      "z": -36.8,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "temperature_cs",
+      "sensor_code": "CS-C-TEMP-01",
+      "name": "TEMP-Computer Science Building",
+      "type": "temperature",
+      "building_id": "cs",
+      "zone_id": "cs_lab",
+      "unit": "\u00b0C",
+      "status": "ONLINE",
+      "x": 55.0,
+      "y": 1.8,
+      "z": -36.8,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    },
+    {
+      "id": "energy_cs",
+      "sensor_code": "CS-C-PWR-03",
+      "name": "PWR-Computer Science Building",
+      "type": "energy",
+      "building_id": "cs",
+      "zone_id": "cs_lecture",
+      "unit": "kW",
+      "status": "ONLINE",
+      "x": 65.2,
+      "y": 1.8,
+      "z": -36.8,
+      "min_value": 0.0,
+      "max_value": 400.0,
+      "normal_min": 0.0,
+      "normal_max": 300.0,
+      "healthy": true
+    },
+    {
+      "id": "smoke_cs",
+      "sensor_code": "CS-C-SMK-04",
+      "name": "SMK-Computer Science Building",
+      "type": "smoke",
+      "building_id": "cs",
+      "zone_id": "cs_stair",
+      "unit": "ppm",
+      "status": "ONLINE",
+      "x": 44.8,
+      "y": 1.8,
+      "z": -27.2,
+      "min_value": 0.0,
+      "max_value": 500.0,
+      "normal_min": 0.0,
+      "normal_max": 10.0,
+      "healthy": true
+    },
+    {
+      "id": "air_quality_cs",
+      "sensor_code": "CS-C-AQI-05",
+      "name": "AQI-Computer Science Building",
+      "type": "air_quality",
+      "building_id": "cs",
+      "zone_id": "cs_ground",
+      "unit": "AQI",
+      "status": "ONLINE",
+      "x": 55.0,
+      "y": 1.8,
+      "z": -27.2,
+      "min_value": 0.0,
+      "max_value": 300.0,
+      "normal_min": 0.0,
+      "normal_max": 100.0,
+      "healthy": true
+    },
+    {
+      "id": "humidity_cs",
+      "sensor_code": "CS-C-HUM-02",
+      "name": "HUM-Computer Science Building",
+      "type": "humidity",
+      "building_id": "cs",
+      "zone_id": "cs_lab",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": 65.2,
+      "y": 1.8,
+      "z": -27.2,
+      "min_value": 15.0,
+      "max_value": 95.0,
+      "normal_min": 30.0,
+      "normal_max": 70.0,
+      "healthy": true
+    },
+    {
+      "id": "occupancy_lib",
+      "sensor_code": "LIB-D-OCC-06",
+      "name": "OCC-Central Library",
+      "type": "occupancy",
+      "building_id": "lib",
+      "zone_id": "lib_ground",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": -62.0,
+      "y": 1.95,
+      "z": 12.399999999999999,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "temperature_lib",
+      "sensor_code": "LIB-D-TEMP-01",
+      "name": "TEMP-Central Library",
+      "type": "temperature",
+      "building_id": "lib",
+      "zone_id": "lib_reading",
+      "unit": "\u00b0C",
+      "status": "ONLINE",
+      "x": -50.0,
+      "y": 1.95,
+      "z": 12.399999999999999,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    },
+    {
+      "id": "energy_lib",
+      "sensor_code": "LIB-D-PWR-03",
+      "name": "PWR-Central Library",
+      "type": "energy",
+      "building_id": "lib",
+      "zone_id": "lib_archive",
+      "unit": "kW",
+      "status": "ONLINE",
+      "x": -38.0,
+      "y": 1.95,
+      "z": 12.399999999999999,
+      "min_value": 0.0,
+      "max_value": 400.0,
+      "normal_min": 0.0,
+      "normal_max": 300.0,
+      "healthy": true
+    },
+    {
+      "id": "smoke_lib",
+      "sensor_code": "LIB-D-SMK-04",
+      "name": "SMK-Central Library",
+      "type": "smoke",
+      "building_id": "lib",
+      "zone_id": "lib_stair",
+      "unit": "ppm",
+      "status": "ONLINE",
+      "x": -62.0,
+      "y": 1.95,
+      "z": 23.6,
+      "min_value": 0.0,
+      "max_value": 500.0,
+      "normal_min": 0.0,
+      "normal_max": 10.0,
+      "healthy": true
+    },
+    {
+      "id": "air_quality_lib",
+      "sensor_code": "LIB-D-AQI-05",
+      "name": "AQI-Central Library",
+      "type": "air_quality",
+      "building_id": "lib",
+      "zone_id": "lib_ground",
+      "unit": "AQI",
+      "status": "ONLINE",
+      "x": -50.0,
+      "y": 1.95,
+      "z": 23.6,
+      "min_value": 0.0,
+      "max_value": 300.0,
+      "normal_min": 0.0,
+      "normal_max": 100.0,
+      "healthy": true
+    },
+    {
+      "id": "humidity_lib",
+      "sensor_code": "LIB-D-HUM-02",
+      "name": "HUM-Central Library",
+      "type": "humidity",
+      "building_id": "lib",
+      "zone_id": "lib_reading",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": -38.0,
+      "y": 1.95,
+      "z": 23.6,
+      "min_value": 15.0,
+      "max_value": 95.0,
+      "normal_min": 30.0,
+      "normal_max": 70.0,
+      "healthy": true
+    },
+    {
+      "id": "occupancy_canteen",
+      "sensor_code": "CAN-E-OCC-06",
+      "name": "OCC-Canteen & Dining Hall",
+      "type": "occupancy",
+      "building_id": "canteen",
+      "zone_id": "canteen_dining",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": -10.799999999999999,
+      "y": 0.9,
+      "z": 28.0,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "temperature_canteen",
+      "sensor_code": "CAN-E-TEMP-01",
+      "name": "TEMP-Canteen & Dining Hall",
+      "type": "temperature",
+      "building_id": "canteen",
+      "zone_id": "canteen_kitchen",
+      "unit": "\u00b0C",
+      "status": "ONLINE",
+      "x": 0.0,
+      "y": 0.9,
+      "z": 28.0,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    },
+    {
+      "id": "energy_canteen",
+      "sensor_code": "CAN-E-PWR-03",
+      "name": "PWR-Canteen & Dining Hall",
+      "type": "energy",
+      "building_id": "canteen",
+      "zone_id": "canteen_dining",
+      "unit": "kW",
+      "status": "ONLINE",
+      "x": 10.799999999999999,
+      "y": 0.9,
+      "z": 28.0,
+      "min_value": 0.0,
+      "max_value": 400.0,
+      "normal_min": 0.0,
+      "normal_max": 300.0,
+      "healthy": true
+    },
+    {
+      "id": "smoke_canteen",
+      "sensor_code": "CAN-E-SMK-04",
+      "name": "SMK-Canteen & Dining Hall",
+      "type": "smoke",
+      "building_id": "canteen",
+      "zone_id": "canteen_kitchen",
+      "unit": "ppm",
+      "status": "ONLINE",
+      "x": -10.799999999999999,
+      "y": 0.9,
+      "z": 36.0,
+      "min_value": 0.0,
+      "max_value": 500.0,
+      "normal_min": 0.0,
+      "normal_max": 10.0,
+      "healthy": true
+    },
+    {
+      "id": "air_quality_canteen",
+      "sensor_code": "CAN-E-AQI-05",
+      "name": "AQI-Canteen & Dining Hall",
+      "type": "air_quality",
+      "building_id": "canteen",
+      "zone_id": "canteen_dining",
+      "unit": "AQI",
+      "status": "ONLINE",
+      "x": 0.0,
+      "y": 0.9,
+      "z": 36.0,
+      "min_value": 0.0,
+      "max_value": 300.0,
+      "normal_min": 0.0,
+      "normal_max": 100.0,
+      "healthy": true
+    },
+    {
+      "id": "humidity_canteen",
+      "sensor_code": "CAN-E-HUM-02",
+      "name": "HUM-Canteen & Dining Hall",
+      "type": "humidity",
+      "building_id": "canteen",
+      "zone_id": "canteen_kitchen",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": 10.799999999999999,
+      "y": 0.9,
+      "z": 36.0,
+      "min_value": 15.0,
+      "max_value": 95.0,
+      "normal_min": 30.0,
+      "normal_max": 70.0,
+      "healthy": true
+    },
+    {
+      "id": "occupancy_clinic",
+      "sensor_code": "CLI-F-OCC-06",
+      "name": "OCC-Campus Clinic",
+      "type": "occupancy",
+      "building_id": "clinic",
+      "zone_id": "clinic_reception",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": 44.2,
+      "y": 0.9,
+      "z": 16.4,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "temperature_clinic",
+      "sensor_code": "CLI-F-TEMP-01",
+      "name": "TEMP-Campus Clinic",
+      "type": "temperature",
+      "building_id": "clinic",
+      "zone_id": "clinic_triage",
+      "unit": "\u00b0C",
+      "status": "ONLINE",
+      "x": 52.0,
+      "y": 0.9,
+      "z": 16.4,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    },
+    {
+      "id": "energy_clinic",
+      "sensor_code": "CLI-F-PWR-03",
+      "name": "PWR-Campus Clinic",
+      "type": "energy",
+      "building_id": "clinic",
+      "zone_id": "clinic_reception",
+      "unit": "kW",
+      "status": "ONLINE",
+      "x": 59.8,
+      "y": 0.9,
+      "z": 16.4,
+      "min_value": 0.0,
+      "max_value": 400.0,
+      "normal_min": 0.0,
+      "normal_max": 300.0,
+      "healthy": true
+    },
+    {
+      "id": "smoke_clinic",
+      "sensor_code": "CLI-F-SMK-04",
+      "name": "SMK-Campus Clinic",
+      "type": "smoke",
+      "building_id": "clinic",
+      "zone_id": "clinic_triage",
+      "unit": "ppm",
+      "status": "ONLINE",
+      "x": 44.2,
+      "y": 0.9,
+      "z": 23.6,
+      "min_value": 0.0,
+      "max_value": 500.0,
+      "normal_min": 0.0,
+      "normal_max": 10.0,
+      "healthy": true
+    },
+    {
+      "id": "air_quality_clinic",
+      "sensor_code": "CLI-F-AQI-05",
+      "name": "AQI-Campus Clinic",
+      "type": "air_quality",
+      "building_id": "clinic",
+      "zone_id": "clinic_reception",
+      "unit": "AQI",
+      "status": "ONLINE",
+      "x": 52.0,
+      "y": 0.9,
+      "z": 23.6,
+      "min_value": 0.0,
+      "max_value": 300.0,
+      "normal_min": 0.0,
+      "normal_max": 100.0,
+      "healthy": true
+    },
+    {
+      "id": "humidity_clinic",
+      "sensor_code": "CLI-F-HUM-02",
+      "name": "HUM-Campus Clinic",
+      "type": "humidity",
+      "building_id": "clinic",
+      "zone_id": "clinic_triage",
+      "unit": "%",
+      "status": "ONLINE",
+      "x": 59.8,
+      "y": 0.9,
+      "z": 23.6,
+      "min_value": 15.0,
+      "max_value": 95.0,
+      "normal_min": 30.0,
+      "normal_max": 70.0,
+      "healthy": true
+    },
+    {
+      "id": "traffic_ring_s_mid",
+      "sensor_code": "CAMPUS-TRF-01",
+      "name": "TRF-South Gate Junction",
+      "type": "traffic",
+      "building_id": null,
+      "node_id": "ring_s_mid",
+      "zone_id": null,
+      "unit": "veh/min",
+      "status": "ONLINE",
+      "x": 0,
+      "y": 1.5,
+      "z": 52,
+      "min_value": 0.0,
+      "max_value": 40.0,
+      "normal_min": 0.0,
+      "normal_max": 20.0,
+      "healthy": true
+    },
+    {
+      "id": "traffic_mid_e",
+      "sensor_code": "CAMPUS-TRF-02",
+      "name": "TRF-East Mid Junction",
+      "type": "traffic",
+      "building_id": null,
+      "node_id": "mid_e",
+      "zone_id": null,
+      "unit": "veh/min",
+      "status": "ONLINE",
+      "x": 78,
+      "y": 1.5,
+      "z": 0,
+      "min_value": 0.0,
+      "max_value": 40.0,
+      "normal_min": 0.0,
+      "normal_max": 20.0,
+      "healthy": true
+    },
+    {
+      "id": "traffic_road_s3",
+      "sensor_code": "CAMPUS-TRF-03",
+      "name": "TRF-South Road East",
+      "type": "traffic",
+      "building_id": null,
+      "node_id": "road_s3",
+      "zone_id": null,
+      "unit": "veh/min",
+      "status": "ONLINE",
+      "x": 27,
+      "y": 1.5,
+      "z": 52,
+      "min_value": 0.0,
+      "max_value": 40.0,
+      "normal_min": 0.0,
+      "normal_max": 20.0,
+      "healthy": true
+    },
+    {
+      "id": "traffic_court_w",
+      "sensor_code": "CAMPUS-TRF-04",
+      "name": "TRF-Courtyard West",
+      "type": "traffic",
+      "building_id": null,
+      "node_id": "court_w",
+      "zone_id": null,
+      "unit": "veh/min",
+      "status": "ONLINE",
+      "x": -27,
+      "y": 1.5,
+      "z": 0,
+      "min_value": 0.0,
+      "max_value": 40.0,
+      "normal_min": 0.0,
+      "normal_max": 20.0,
+      "healthy": true
+    },
+    {
+      "id": "traffic_court_cn",
+      "sensor_code": "CAMPUS-TRF-05",
+      "name": "TRF-Courtyard North",
+      "type": "traffic",
+      "building_id": null,
+      "node_id": "court_cn",
+      "zone_id": null,
+      "unit": "veh/min",
+      "status": "ONLINE",
+      "x": 0,
+      "y": 1.5,
+      "z": -60,
+      "min_value": 0.0,
+      "max_value": 40.0,
+      "normal_min": 0.0,
+      "normal_max": 20.0,
+      "healthy": true
+    },
+    {
+      "id": "parking_main",
+      "type": "parking",
+      "name": "PRK-Main Parking",
+      "building_id": null,
+      "unit": "%",
+      "x": 60,
+      "y": 0.0,
+      "z": 45,
+      "sensor_code": "CAMPUS-PRK-01",
+      "status": "ONLINE",
+      "zone_id": null,
+      "min_value": 0.0,
+      "max_value": 100.0,
+      "normal_min": 0.0,
+      "normal_max": 90.0,
+      "healthy": true
+    },
+    {
+      "id": "water_campus",
+      "type": "water",
+      "name": "WTR-Campus Main",
+      "building_id": null,
+      "unit": "L/min",
+      "x": 0,
+      "y": 0.5,
+      "z": 10,
+      "sensor_code": "CAMPUS-WTR-01",
+      "status": "ONLINE",
+      "zone_id": null,
+      "min_value": 0.0,
+      "max_value": 120.0,
+      "normal_min": 0.0,
+      "normal_max": 80.0,
+      "healthy": true
+    },
+    {
+      "id": "temp_outdoor",
+      "type": "temperature",
+      "name": "TEMP-Ambient",
+      "building_id": null,
+      "unit": "\u00b0C",
+      "x": -15,
+      "y": 2.0,
+      "z": 8,
+      "sensor_code": "CAMPUS-TEMP-01",
+      "status": "ONLINE",
+      "zone_id": null,
+      "min_value": 10.0,
+      "max_value": 60.0,
+      "normal_min": 18.0,
+      "normal_max": 30.0,
+      "healthy": true
+    }
+  ]
+}
