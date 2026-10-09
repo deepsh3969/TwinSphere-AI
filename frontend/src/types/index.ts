@@ -1046,3 +1046,618 @@ export interface RouteGraphInfo {
   mode: RouteMode;
   simulation_id: string | null;
 }
+
+// ------------------------------------------------------------------ Phase 9
+// Command Center, Analytics & Historical Intelligence (§60-§63)
+
+export type AnalyticsRange = '15M' | '1H' | '6H' | '24H' | '7D' | '30D' | 'CUSTOM';
+export type TrendDirection = 'up' | 'down' | 'flat';
+export type KpiStatus = 'GOOD' | 'WARN' | 'CRITICAL' | 'LOW' | 'UNKNOWN';
+export type HealthLevel = 'GOOD' | 'FAIR' | 'POOR';
+export type ComponentStatus = 'ONLINE' | 'DEGRADED' | 'OFFLINE';
+export type IncidentSeverityFilter = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type IncidentStatusFilter = 'ACTIVE' | 'RESOLVED' | 'CLOSED' | 'DISMISSED';
+export type WhatChangedImpact = 'better' | 'worse' | 'info';
+export type TimelineCategory = 'SIMULATION' | 'RISK' | 'ROUTE' | 'AI' | 'RECOVERY' | 'INCIDENT';
+
+export interface AnalyticsWindow {
+  preset: string;
+  from: string;
+  to: string;
+  bucket_s?: number;
+  custom?: boolean;
+}
+
+/** Common metadata block carried by every Phase 9 analytics response. */
+export interface AnalyticsMeta {
+  window: AnalyticsWindow;
+  source: string;
+  computed_at: string;
+}
+
+export interface TrendBlock {
+  direction: TrendDirection;
+  delta: number;
+  delta_pct: number;
+  label: string;
+  available: boolean;
+}
+
+export interface OverviewKpi {
+  id: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  secondary: string;
+  status: KpiStatus | string;
+  trend: TrendBlock;
+  updated_at?: string;
+  detail?: string;
+}
+
+export interface OverviewCounts {
+  active_incidents: number;
+  new_incidents: number;
+  resolved_incidents: number;
+  incident_ids_active: string[];
+  sensors_total: number;
+  sensors_online: number;
+  sensors_offline: number;
+  anomalies: number;
+  recommendations_pending: number;
+  simulations_total: number;
+  active_simulation: string | null;
+}
+
+export interface OverviewResponse extends AnalyticsMeta {
+  kpis: OverviewKpi[];
+  counts: OverviewCounts;
+  confidence: { prediction_accuracy: number | null; available: boolean; reason?: string };
+}
+
+export interface SeriesPoint {
+  t: string;
+  value: number;
+  samples?: number;
+}
+
+export interface RiskBandTime {
+  category: string;
+  seconds: number;
+  pct: number;
+}
+
+export interface CriticalEvent {
+  id: string;
+  title: string;
+  severity: string;
+  started_at: string;
+  building_id: string | null;
+}
+
+export interface HeatmapCell { t: string; value: number | null }
+export interface HeatmapRow { entity: string; name: string; cells: HeatmapCell[] }
+
+export interface RiskAnalyticsResponse extends AnalyticsMeta {
+  entity: string;
+  available: boolean;
+  reason?: string;
+  current: number;
+  level: string;
+  stats: { avg: number; max: number; min: number; samples: number };
+  trend: TrendBlock;
+  time_in_category: RiskBandTime[];
+  critical_events: CriticalEvent[];
+  series: SeriesPoint[];
+  heatmap: { buckets: string[]; rows: HeatmapRow[] };
+  factors: RiskFactor[];
+  explanation: string;
+}
+
+export interface OccupancyBuildingRow {
+  id: string;
+  name: string;
+  current: number;
+  capacity: number;
+  pct: number;
+  avg: number;
+  peak: number;
+  last_at: string | null;
+}
+
+export interface OccupancyAnalyticsResponse extends AnalyticsMeta {
+  available: boolean;
+  reason?: string;
+  series: Array<SeriesPoint & { pct: number; buildings: number }>;
+  stats: { avg: number; peak: number; min: number; peak_at: string | null; samples: number };
+  current: number | null;
+  capacity: number | null;
+  trend: TrendBlock;
+  by_building: OccupancyBuildingRow[];
+  peak_hour: string | null;
+}
+
+export interface EnergyBuildingRow {
+  id: string;
+  name: string;
+  current: number | null;
+  avg: number | null;
+  max: number | null;
+  available: boolean;
+}
+
+export interface EnergyAnalyticsResponse extends AnalyticsMeta {
+  available: boolean;
+  reason?: string;
+  series: Array<SeriesPoint & { sensors: number }>;
+  stats: { available: boolean; avg: number; min: number; max: number; samples: number;
+           last_at: string | null };
+  current: number | null;
+  trend: TrendBlock;
+  abnormal: { count: number; available: boolean; definition: string };
+  anomalies_live: Array<Record<string, unknown>>;
+  by_building: EnergyBuildingRow[];
+}
+
+export interface EnvironmentMetricBlock {
+  metric: string;
+  unit: string;
+  available: boolean;
+  reason?: string | null;
+  stats: { available: boolean; avg: number; min: number; max: number; samples: number;
+           last_at: string | null };
+  series: Array<SeriesPoint & { sensors: number }>;
+  trend: TrendBlock;
+  abnormal_readings: number;
+}
+
+export interface EnvironmentAnalyticsResponse extends AnalyticsMeta {
+  metrics: EnvironmentMetricBlock[];
+  live_temperature: number;
+}
+
+export interface SensorHealthTotals {
+  total: number;
+  online: number;
+  offline: number;
+  health_pct: number;
+  out_of_range_readings: number;
+  diagnostics: number;
+}
+
+export interface SensorDiagnostic {
+  sensor_id: string;
+  name: string;
+  type: string;
+  building_id: string | null;
+  zone_id: string | null;
+  sensor_code: string;
+  value: number;
+  unit: string;
+  status: string;
+  db_status: string;
+  last_reading_at: string | null;
+  age_seconds: number;
+  issues: string[];
+}
+
+export interface SensorAiStatusBlock {
+  status: string;
+  score: number;
+  type: string | null;
+  detector: string | null;
+  anomaly_id: string | null;
+  available_samples: number;
+  minimum_required: number;
+}
+
+export interface SensorHealthResponse extends AnalyticsMeta {
+  totals: SensorHealthTotals;
+  status: 'HEALTHY' | 'DEGRADED' | 'UNHEALTHY' | string;
+  by_type: Array<{ type: string; total: number; healthy: number; health_pct: number }>;
+  diagnostics: SensorDiagnostic[];
+  ai_status: Record<string, SensorAiStatusBlock>;
+}
+
+export interface SensorHealthDetailResponse extends AnalyticsMeta {
+  sensor: { id: string; sensor_code: string; name: string; type: string;
+            building_id: string | null; zone_id: string | null; unit: string;
+            normal_min: number | null; normal_max: number | null };
+  status: string;
+  healthy: boolean;
+  current: number | null;
+  series: Array<SeriesPoint & { min: number; max: number; sensors?: number }>;
+  stats: { available: boolean; avg: number; min: number; max: number; samples: number };
+  trend: TrendBlock;
+}
+
+export interface BuildingAnalyticsRow {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  status: string;
+  risk: number;
+  risk_level: string;
+  risk_avg: number | null;
+  risk_trend: TrendBlock;
+  occupancy: number;
+  capacity: number;
+  occupancy_pct: number;
+  occupancy_avg: number | null;
+  energy: number | null;
+  energy_avg: number | null;
+  temperature: number | null;
+  incidents: number;
+  sensors: number;
+  sensor_health: number;
+}
+
+export interface BuildingsAnalyticsResponse extends AnalyticsMeta {
+  buildings: BuildingAnalyticsRow[];
+  count: number;
+}
+
+export interface BuildingAnalyticsDetailResponse extends AnalyticsMeta {
+  building: BuildingAnalyticsRow;
+  risk: RiskAnalyticsResponse;
+  occupancy: { series: OccupancyAnalyticsResponse['series']; trend: TrendBlock };
+  environment: EnvironmentMetricBlock[];
+  incidents: Array<{ id: string; code: string; title: string; kind: string;
+                     severity: string; status: string; started_at: string;
+                     resolved_at: string | null }>;
+  sensors: Array<{ id: string; name: string; type: string; status: string;
+                   healthy: boolean; value: number; unit: string;
+                   zone_id: string | null }>;
+}
+
+export interface CompareCellValue { raw: number | null; norm: number | null }
+export interface CompareRow {
+  metric: string;
+  label: string;
+  unit: string;
+  values: Record<string, CompareCellValue>;
+}
+
+export interface BuildingsCompareResponse extends AnalyticsMeta {
+  available: boolean;
+  reason?: string;
+  buildings: Array<{ id: string; name: string }>;
+  rows: CompareRow[];
+  note: string;
+}
+
+export interface RoutesAnalyticsResponse extends AnalyticsMeta {
+  available: boolean;
+  reason?: string;
+  stats: { events: number; recalculations: number; by_event: Record<string, number>;
+           by_mode: Record<string, number>; avg_distance: number; avg_eta_s: number;
+           avg_risk_score: number | null; avg_congestion: number;
+           avg_interval_s: number | null };
+  trend: TrendBlock;
+  series: Array<SeriesPoint & { risk: number }>;
+  current: { active_routes: number; route_version: number; mode: string;
+             bottlenecks: string[]; evacuation_status: string;
+             in_memory_history: number };
+}
+
+export interface AiAnalyticsResponse extends AnalyticsMeta {
+  available: boolean;
+  reason?: string;
+  stats: { analyses: number; by_mode: Record<string, number>;
+           by_severity: Record<string, number>; by_priority: Record<string, number>;
+           by_source: Record<string, number>; avg_confidence: number | null;
+           avg_latency_ms: number | null; recommendations: number;
+           recommendations_by_status: Record<string, number>;
+           recommendations_by_priority: Record<string, number>;
+           decisions: number; acceptance_rate: number | null; evidence_items: number };
+  trend: TrendBlock;
+  series: SeriesPoint[];
+  engine: {
+    analyst: Record<string, unknown>;
+    ai: Record<string, unknown>;
+    anomalies: number;
+    predictions: number;
+  };
+}
+
+export interface SystemComponent {
+  id: string;
+  name: string;
+  status: ComponentStatus;
+  message: string;
+  updated_at: string | null;
+}
+
+export interface SystemStatusResponse {
+  components: SystemComponent[];
+  summary: { total: number; online: number; degraded: number; offline: number };
+  computed_at: string;
+}
+
+export interface HealthComponent {
+  id: string;
+  label: string;
+  weight: number;
+  value: number | null;
+  score: number;
+  detail: string;
+  note: string | null;
+}
+
+export interface CampusHealthResponse extends AnalyticsMeta {
+  score: number;
+  level: HealthLevel;
+  components: HealthComponent[];
+  weights_total: number;
+}
+
+export interface WhatChangedRow {
+  metric: string;
+  label: string;
+  unit: string;
+  previous: number | null;
+  current: number | null;
+  delta: number | null;
+  delta_pct: number | null;
+  direction: TrendDirection | string;
+  change: string;
+  impact: WhatChangedImpact;
+  available: boolean;
+}
+
+export interface WhatChangedResponse {
+  ago_minutes: number;
+  rows: WhatChangedRow[];
+  summary: { improved: number; worsened: number; unchanged: number; headline: string };
+  note: string;
+  computed_at: string;
+}
+
+export interface PredictionAccuracy {
+  available: boolean;
+  reason?: string;
+  accuracy?: number | null;
+  samples: number;
+  method?: string;
+  source?: string;
+  metrics?: Array<Record<string, unknown>>;
+}
+
+// ------------------------------------------------------------ §62 history
+
+export interface HistoryIncident {
+  id: string;
+  code: string;
+  title: string;
+  kind: string;
+  severity: string;
+  status: string;
+  building_id: string | null;
+  location_type: string | null;
+  location_id: string | null;
+  risk_score: number | null;
+  started_at: string;
+  resolved_at: string | null;
+  duration_s: number | null;
+  simulation_id: string | null;
+  description: string;
+}
+
+export interface IncidentListResponse {
+  items: HistoryIncident[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  filters: Record<string, string | null>;
+  source: string;
+  generated_at: string;
+}
+
+export interface HistoryTimelineItem {
+  id: string;
+  sim_t: number | null;
+  t: string;
+  category: TimelineCategory | string;
+  kind: string;
+  title: string;
+  source: string;
+  data: Record<string, unknown>;
+}
+
+export interface HistoryMetrics {
+  duration_s: number | null;
+  risk_entity: string | null;
+  peak_risk: number | null;
+  avg_risk: number | null;
+  risk_samples: number;
+  people_affected: number | null;
+  timeline_items: number;
+  recommendations: number;
+}
+
+export interface IncidentDetailResponse {
+  incident: HistoryIncident;
+  simulation: Record<string, unknown> | null;
+  metrics: HistoryMetrics;
+  timeline: HistoryTimelineItem[];
+  recommendations: Array<Record<string, unknown>>;
+  source: string;
+  generated_at: string;
+}
+
+export interface IncidentReportResponse extends IncidentDetailResponse {
+  report_type: string;
+  executive_summary: string;
+  window: { started_at: string | null; resolved_at: string | null;
+            duration_s: number | null };
+  timeline_categories: Record<string, number>;
+  contributing_factors: Array<Record<string, unknown>>;
+  response_actions: Array<{ title: string; category: string; t: string | number }>;
+}
+
+export interface HistorySimulation {
+  id: string;
+  code: string;
+  scenario: string;
+  target_id: string | null;
+  target_type: string | null;
+  status: string;
+  severity: string;
+  peak_risk: number;
+  people_affected: number;
+  recovery_time_s: number;
+  progress: number;
+  created_at: string;
+  ended_at: string | null;
+  created_by: string | null;
+  events: number;
+}
+
+export interface SimulationListResponse {
+  items: HistorySimulation[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  filters: Record<string, string | null>;
+  source: string;
+  generated_at: string;
+}
+
+export interface HistorySimEvent {
+  id: number;
+  t: number;
+  kind: string;
+  category: TimelineCategory | string;
+  message: string;
+  data: Record<string, unknown>;
+  created_at?: string;
+  wall?: string | null;
+}
+
+export interface SimulationDetailResponse {
+  simulation: HistorySimulation & { params: Record<string, unknown>;
+                                    started_at: string | null;
+                                    result: Record<string, unknown> };
+  metrics: { events: number; events_by_category: Record<string, number>;
+             incidents: number; route_events: number;
+             ai_analyses_in_window: number; wall_start: string | null;
+             wall_end: string | null; risk_entity: string | null;
+             peak_risk_persisted: number | null; avg_risk_persisted: number | null };
+  incidents: HistoryIncident[];
+  events: HistorySimEvent[];
+  source: string;
+  generated_at: string;
+}
+
+export interface SimulationEventsResponse {
+  simulation_id: string;
+  code: string;
+  scenario: string;
+  status: string;
+  duration_s: number;
+  count: number;
+  events: HistorySimEvent[];
+  source: string;
+  generated_at: string;
+}
+
+export interface SimulationCompareResponse {
+  a: { id: string; code: string };
+  b: { id: string; code: string };
+  rows: Array<{ metric: string; label: string; a: string | number | null;
+                b: string | number | null }>;
+  source: string;
+  generated_at: string;
+}
+
+// ------------------------------------------------------------ §63 replay
+
+export interface ReplayRoutePoint {
+  id: number;
+  event: string;
+  mode: string;
+  origin: string | null;
+  destination: string | null;
+  distance: number;
+  eta_s: number;
+  risk_score: number;
+  path: string[];
+  wall: string | null;
+}
+
+export interface ReplayAiPoint {
+  id: string;
+  mode: string;
+  severity: string;
+  title: string;
+  confidence: number | null;
+  summary: string;
+  adjacent: boolean;
+  wall: string | null;
+}
+
+export interface ReplayIncidentItem {
+  id: string;
+  code: string;
+  title: string;
+  kind: string;
+  severity: string;
+  status: string;
+  started_wall: string | null;
+  resolved_wall: string | null;
+  start_t: number | null;
+  end_t: number | null;
+}
+
+export interface ReplayFrame {
+  t: number;
+  wall: string | null;
+  status: string;
+  last_kind: string;
+  people_at_risk: number;
+  fire_fraction: number;
+  burning_zones: string[];
+  risk: Record<string, number>;
+  occupancy: number | null;
+  route: ReplayRoutePoint | null;
+  ai: ReplayAiPoint | null;
+  incident: { id: string; code: string; title: string; severity: string } | null;
+}
+
+export interface ReplayPayload {
+  simulation: { id: string; code: string; scenario: string; target_id: string | null;
+                status: string; severity: string; peak_risk: number;
+                people_affected: number; recovery_time_s: number;
+                created_at: string | null; ended_at: string | null };
+  duration_s: number;
+  frame_step_s: number;
+  wall: { start: string | null; end: string | null; span_s: number;
+          clock_hour: number };
+  categories: string[];
+  speeds: number[];
+  zone_buildings: Record<string, string>;
+  events: HistorySimEvent[];
+  frames: ReplayFrame[];
+  risk_series: Array<{ t: number; entity: string; score: number }>;
+  route_events: ReplayRoutePoint[];
+  ai_analyses: ReplayAiPoint[];
+  incidents: ReplayIncidentItem[];
+  notes: { risk?: string; zones?: string; ai_adjacent?: boolean };
+  source: string;
+  built_at: string;
+}
+
+/** Phase 9 store slice — replay runs entirely separate from live state. */
+export interface ReplayState {
+  replay: ReplayPayload | null;
+  replaySimId: string | null;
+  replayT: number;
+  replayPlaying: boolean;
+  replaySpeed: number;
+  replayLoading: boolean;
+  replayError: string | null;
+  replaySnapshot: Snapshot | null;
+}

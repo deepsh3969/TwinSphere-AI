@@ -12,6 +12,7 @@ from app.api import (
     routes_auth,
     routes_campus,
     routes_evacuation,
+    routes_history,
     routes_realtime,
     routes_settings,
     routes_simulations,
@@ -85,6 +86,8 @@ for router in (
     routes_settings.router, routes_realtime.router,
     # Phase 7: registered after routes_campus so legacy /api/routes* stay intact
     routes_evacuation.router,
+    # Phase 9: history + replay (separate prefix /api/history)
+    routes_history.router,
 ):
     app.include_router(router)
 

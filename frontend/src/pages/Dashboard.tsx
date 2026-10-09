@@ -1,11 +1,15 @@
-import { useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AIPanel from '../components/dashboard/AIPanel';
 import BuildingPanel from '../components/dashboard/BuildingPanel';
 import EventTimeline from '../components/dashboard/EventTimeline';
+import HealthChangesPanel from '../components/dashboard/HealthChangesPanel';
+import KpiStrip from '../components/dashboard/KpiStrip';
 import MetricTile from '../components/dashboard/MetricTile';
 import RiskGauge from '../components/dashboard/RiskGauge';
+import SystemHealthBar from '../components/dashboard/SystemHealthBar';
 import CampusScene from '../components/3d/CampusScene';
+import ReplayControls, { ReplayBanner } from '../components/replay/ReplayControls';
 import {
   IconAlert, IconActivity, IconBrain, IconChart, IconCheck, IconFire, IconRefresh,
   IconRoad, IconTarget, IconThermo, IconUsers, IconX, IconZap,
@@ -40,6 +44,34 @@ export default function Dashboard() {
   useEffect(() => {
     if (!useTwinStore.getState().evacuation) void refreshRouteData();
   }, [refreshRouteData]);
+
+  // Phase 9 §63 — replay is URL-driven (?replay=<simId>) and separate from live
+  const [searchParams, setSearchParams] = useSearchParams();
+  const replayParam = searchParams.get('replay');
+  const replay = useTwinStore((s) => s.replay);
+  const replayLoading = useTwinStore((s) => s.replayLoading);
+  const loadReplay = useTwinStore((s) => s.loadReplay);
+  const replayActive = Boolean(replay) || replayLoading;
+
+  useEffect(() => {
+    if (replayParam) {
+      void loadReplay(replayParam);
+    } else {
+      const st = useTwinStore.getState();
+      if (st.replay || st.replayError) st.closeReplay();
+    }
+  }, [replayParam, loadReplay]);
+  useEffect(() => () => useTwinStore.getState().closeReplay(), []);
+
+  const clearReplayParam = useCallback(() => {
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.delete('replay');
+      return p;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const [railTab, setRailTab] = useState<'ai' | 'health'>('ai');
 
   const m = snapshot?.metrics;
   const sim = snapshot?.active_sim;
@@ -101,13 +133,22 @@ export default function Dashboard() {
                 <div className="text-[12.5px] font-semibold">
                   {snapshot.buildings.length} buildings · {snapshot.sensors.length} sensors
                 </div>
-                <div className="text-[10px] text-mist-500 num">
-                  {connection === 'CONNECTED' ? `live · ${Math.max(0, Math.round((Date.now() - lastUpdate) / 1000))}s ago` : 'reconnecting…'}
-                </div>
+                {replayActive ? (
+                  <div className="text-[10px] text-amber-300 num flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    REPLAY · historical view
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-mist-500 num">
+                    {connection === 'CONNECTED' ? `live · ${Math.max(0, Math.round((Date.now() - lastUpdate) / 1000))}s ago` : 'reconnecting…'}
+                  </div>
+                )}
               </div>
             </div>
 
-            {sim && (
+            <ReplayBanner onExit={clearReplayParam} />
+
+            {sim && !replayActive && (
               <div className="panel rounded-lg px-3 py-2 w-[260px] border-orange-700/70">
                 <div className="flex items-center gap-2">
                   <span className="text-base">{scenarioIcon(sim.scenario)}</span>
@@ -165,10 +206,15 @@ export default function Dashboard() {
           )}
 
           {selectedId && <BuildingPanel onClose={() => void selectBuilding(null)} />}
+          {replayActive && <ReplayControls onExit={clearReplayParam} />}
         </div>
 
         {/* bottom metric strip */}
         <div className="shrink-0 border-t border-line bg-ink-900/70 px-3 py-2.5">
+          {/* Phase 9 §60 — server-computed KPI strip with trends */}
+          <div className="mb-2">
+            <KpiStrip />
+          </div>
           <div className="grid grid-cols-4 xl:grid-cols-8 gap-2">
             <MetricTile
               label="Occupancy" value={fmtNum(m?.occupancy ?? 0)}
@@ -256,6 +302,11 @@ export default function Dashboard() {
               icon={<IconBrain width={12} height={12} />}
             />
           </div>
+
+          {/* Phase 9 §60 — system-health bottom bar */}
+          <div className="-mx-3 -mb-2.5 mt-2">
+            <SystemHealthBar />
+          </div>
         </div>
       </div>
 
@@ -265,8 +316,22 @@ export default function Dashboard() {
           <div className="border-b border-line px-3 py-2.5">
             <RiskGauge risk={riskPublished ?? snapshot.risk} />
           </div>
+          <div className="flex gap-1 px-3 py-1.5 border-b border-line shrink-0">
+            <button
+              className={`chip !text-[10.5px] ${railTab === 'ai' ? 'border-brand-400 bg-brand-950/70 text-brand-200' : ''}`}
+              onClick={() => setRailTab('ai')}
+            >
+              AI feed
+            </button>
+            <button
+              className={`chip !text-[10.5px] ${railTab === 'health' ? 'border-brand-400 bg-brand-950/70 text-brand-200' : ''}`}
+              onClick={() => setRailTab('health')}
+            >
+              Health &amp; changes
+            </button>
+          </div>
           <div className="flex-1 min-h-0">
-            <AIPanel />
+            {railTab === 'ai' ? <AIPanel /> : <HealthChangesPanel />}
           </div>
           <div className="h-[150px] shrink-0 border-t border-line">
             <EventTimeline compact />

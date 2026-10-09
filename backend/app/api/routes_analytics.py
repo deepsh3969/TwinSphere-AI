@@ -1,16 +1,23 @@
-"""Analytics time-series endpoints (Recharts-friendly payloads)."""
+"""Analytics time-series endpoints (Recharts-friendly payloads).
+
+Phase 9 adds real server-side aggregation endpoints (`/api/analytics/*`) — see
+`app.services.analytics_service`.  The legacy `/timeseries` endpoint below is
+kept unchanged for backward compatibility with earlier phases.
+"""
 
 from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import require
 from app.models.entities import Incident, SensorReading, Simulation
+from app.services import analytics_service as analytics
 from app.services.sensor_engine import BUILDING_PROFILE, occupancy_curve, outdoor_temperature
 from app.services.state import get_state
 
@@ -148,3 +155,177 @@ def timeseries(window: str = Query("24H", alias="range"), principal: dict = Depe
                                for p in pred_rows],
         "source": "simulated telemetry (diurnal model + persisted readings)",
     }
+
+
+# =====================================================================
+# Phase 9 — command centre analytics (server-side aggregation, §9–§48)
+# =====================================================================
+
+def _window(range_: str, start: str | None, end: str | None) -> analytics.Window:
+    return analytics.resolve_window(range_, start, end)
+
+
+@router.get("/overview")
+def analytics_overview(range: str = Query("24H"), start: str | None = Query(None),
+                       end: str | None = Query(None),
+                       principal: dict = Depends(require("read")),
+                       db: Session = Depends(get_db)):
+    """Dashboard KPI strip: value + status + trend + freshness per KPI (§17–§24)."""
+    return analytics.overview(db, get_state(), _window(range, start, end))
+
+
+@router.get("/risk")
+def analytics_risk(range: str = Query("24H"), start: str | None = Query(None),
+                   end: str | None = Query(None),
+                   building_id: str | None = Query(None),
+                   principal: dict = Depends(require("read")),
+                   db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    return analytics.risk_analytics(db, get_state(), window, building_id=building_id)
+
+
+@router.get("/occupancy")
+def analytics_occupancy(range: str = Query("24H"), start: str | None = Query(None),
+                        end: str | None = Query(None),
+                        building_id: str | None = Query(None),
+                        principal: dict = Depends(require("read")),
+                        db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    return analytics.occupancy_analytics(db, get_state(), window, building_id=building_id)
+
+
+@router.get("/energy")
+def analytics_energy(range: str = Query("24H"), start: str | None = Query(None),
+                     end: str | None = Query(None),
+                     building_id: str | None = Query(None),
+                     principal: dict = Depends(require("read")),
+                     db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    return analytics.energy_analytics(db, get_state(), window, building_id=building_id)
+
+
+@router.get("/environment")
+def analytics_environment(range: str = Query("24H"), start: str | None = Query(None),
+                          end: str | None = Query(None),
+                          building_id: str | None = Query(None),
+                          principal: dict = Depends(require("read")),
+                          db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    return analytics.environment_analytics(db, get_state(), window, building_id=building_id)
+
+
+@router.get("/sensors")
+def analytics_sensors(range: str = Query("24H"), start: str | None = Query(None),
+                      end: str | None = Query(None),
+                      principal: dict = Depends(require("read")),
+                      db: Session = Depends(get_db)):
+    """Sensor health totals + diagnostics list (§42)."""
+    return analytics.sensor_health(db, get_state(), _window(range, start, end))
+
+
+@router.get("/sensors/{sensor_id}")
+def analytics_sensor_detail(sensor_id: str, range: str = Query("24H"),
+                            start: str | None = Query(None), end: str | None = Query(None),
+                            principal: dict = Depends(require("read")),
+                            db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    out = analytics.sensor_detail(db, get_state(), sensor_id, window)
+    if out is None:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    return out
+
+
+@router.get("/buildings")
+def analytics_buildings(range: str = Query("24H"), start: str | None = Query(None),
+                        end: str | None = Query(None),
+                        principal: dict = Depends(require("read")),
+                        db: Session = Depends(get_db)):
+    return analytics.buildings_analytics(db, get_state(), _window(range, start, end))
+
+
+@router.get("/buildings/compare")
+def analytics_buildings_compare(ids: str = Query(..., description="comma-separated ids"),
+                                range: str = Query("24H"), start: str | None = Query(None),
+                                end: str | None = Query(None),
+                                principal: dict = Depends(require("read")),
+                                db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    id_list = [i.strip() for i in ids.split(",") if i.strip()]
+    return analytics.buildings_compare(db, get_state(), id_list, window)
+
+
+@router.get("/buildings/{building_id}")
+def analytics_building_detail(building_id: str, range: str = Query("24H"),
+                              start: str | None = Query(None), end: str | None = Query(None),
+                              principal: dict = Depends(require("read")),
+                              db: Session = Depends(get_db)):
+    window = _window(range, start, end)
+    out = analytics.building_detail(db, get_state(), building_id, window)
+    if out is None:
+        raise HTTPException(status_code=404, detail="Building not found")
+    return out
+
+
+@router.get("/routes")
+def analytics_routes(range: str = Query("24H"), start: str | None = Query(None),
+                     end: str | None = Query(None),
+                     principal: dict = Depends(require("read")),
+                     db: Session = Depends(get_db)):
+    return analytics.routes_analytics(db, get_state(), _window(range, start, end))
+
+
+@router.get("/ai")
+def analytics_ai(range: str = Query("24H"), start: str | None = Query(None),
+                 end: str | None = Query(None),
+                 principal: dict = Depends(require("read")),
+                 db: Session = Depends(get_db)):
+    return analytics.ai_analytics(db, get_state(), _window(range, start, end))
+
+
+@router.get("/system")
+def analytics_system(principal: dict = Depends(require("read")),
+                     db: Session = Depends(get_db)):
+    """System-health strip: component statuses + updated_at (§43)."""
+    return analytics.system_status(db, get_state())
+
+
+@router.get("/health")
+def analytics_health(range: str = Query("24H"), start: str | None = Query(None),
+                     end: str | None = Query(None),
+                     principal: dict = Depends(require("read")),
+                     db: Session = Depends(get_db)):
+    """Composite campus health score with transparent contributions (§46)."""
+    return analytics.campus_health(db, get_state(), _window(range, start, end))
+
+
+@router.get("/what-changed")
+def analytics_what_changed(ago: int = Query(60, le=10080),
+                           principal: dict = Depends(require("read")),
+                           db: Session = Depends(get_db)):
+    """NOW vs N-minutes-ago comparison (§44)."""
+    return analytics.what_changed(db, get_state(), ago)
+
+
+@router.get("/export")
+def analytics_export(kind: str = Query("summary"),
+                     range: str = Query("24H"), start: str | None = Query(None),
+                     end: str | None = Query(None), format: str = Query("csv"),
+                     principal: dict = Depends(require("read")),
+                     db: Session = Depends(get_db)):
+    """CSV/JSON export of an analytics dataset (§33)."""
+    kind = kind.lower()
+    if kind not in analytics.EXPORT_KINDS:
+        raise HTTPException(status_code=400,
+                            detail=f"kind must be one of {', '.join(analytics.EXPORT_KINDS)}")
+    window = _window(range, start, end)
+    try:
+        filename, media_type, body = analytics.export_dataset(db, get_state(), kind, window)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if format == "json":
+        import json as _json
+        return Response(content=_json.dumps({"kind": kind, "window": window.as_dict(),
+                                             "csv": body}, default=str),
+                        media_type="application/json")
+    return Response(content=body, media_type=media_type,
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})

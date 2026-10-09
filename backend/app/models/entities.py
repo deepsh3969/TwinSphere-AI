@@ -171,6 +171,11 @@ class OccupancyRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+# Phase 9: analytics range scans (building within window)
+Index("ix_occupancy_records_building_time", OccupancyRecord.building_id,
+      OccupancyRecord.created_at)
+
+
 class Incident(Base):
     __tablename__ = "incidents"
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -189,6 +194,11 @@ class Incident(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     # Phase 6: incident produced by an emergency simulation (nullable, additive)
     simulation_id: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
+
+
+# Phase 9: incident history filters (severity/type facets)
+Index("ix_incidents_severity", Incident.severity)
+Index("ix_incidents_kind", Incident.kind)
 
 
 class Simulation(Base):
@@ -227,6 +237,10 @@ class SimulationEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+# Phase 9: replay reads a simulation's events in time order
+Index("ix_simulation_events_sim_t", SimulationEvent.simulation_id, SimulationEvent.t)
+
+
 class RiskScore(Base):
     __tablename__ = "risk_scores"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -237,6 +251,10 @@ class RiskScore(Base):
     factors: Mapped[list] = mapped_column(JSON, default=list)
     explanation: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+# Phase 9: analytics range scans (entity within window)
+Index("ix_risk_scores_entity_time", RiskScore.entity_id, RiskScore.created_at)
 
 
 class EvacuationRoute(Base):
@@ -282,6 +300,10 @@ class RouteEvent(Base):
     route_version: Mapped[int] = mapped_column(Integer, default=1)
     reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+# Phase 9: route analytics reads a simulation's route history in time order
+Index("ix_route_events_sim_time", RouteEvent.simulation_id, RouteEvent.created_at)
 
 
 class Prediction(Base):

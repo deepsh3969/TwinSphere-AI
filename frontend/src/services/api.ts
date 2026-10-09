@@ -1,10 +1,19 @@
 import type {
   ActiveSim, AIEventsResponse, AnalystReport, AnomaliesResponse, Anomaly,
-  BuildingDetail, BuildingEvacuationPlan, EmergencyRoutesResponse, EvacuationOverview,
-  EvacuationStatus, Floor, FloorDetail, Incident, Prediction, PredictionsResponse,
-  RealtimeStatus, Recommendation, RiskResponse, RiskResult, RouteAlternativesResponse,
-  RouteGraphInfo, RouteHistoryRow, RouteMode, RoutePlan, Sensor, SensorHistory,
-  SimHistoryItem, SimulationResults, Snapshot, User, Zone, ZoneDetail,
+  AiAnalyticsResponse, BuildingsAnalyticsResponse, BuildingAnalyticsDetailResponse,
+  BuildingsCompareResponse, BuildingDetail, BuildingEvacuationPlan,
+  CampusHealthResponse, EnergyAnalyticsResponse, EmergencyRoutesResponse,
+  EnvironmentAnalyticsResponse, EvacuationOverview, EvacuationStatus, Floor,
+  FloorDetail, Incident, IncidentDetailResponse, IncidentListResponse,
+  IncidentReportResponse, OccupancyAnalyticsResponse, OverviewResponse,
+  Prediction, PredictionsResponse,
+  RealtimeStatus, Recommendation, ReplayFrame, ReplayPayload, RiskAnalyticsResponse,
+  RiskResponse, RiskResult, RouteAlternativesResponse, RouteGraphInfo,
+  RouteHistoryRow, RouteMode, RoutePlan, RoutesAnalyticsResponse, Sensor,
+  SensorHealthDetailResponse, SensorHealthResponse, SensorHistory, SimHistoryItem,
+  SimulationCompareResponse, SimulationDetailResponse, SimulationEventsResponse,
+  SimulationListResponse, SimulationResults, Snapshot, SystemStatusResponse, User,
+  WhatChangedResponse, Zone, ZoneDetail,
 } from '../types';
 
 const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
@@ -60,6 +69,33 @@ function query(params?: Record<string, string | number | undefined | null>): str
     .map(([k, v]) => [k, String(v)]);
   const qs = new URLSearchParams(entries).toString();
   return qs ? `?${qs}` : '';
+}
+
+/** Fetch a CSV/text resource with the same auth + error handling as `request`. */
+async function requestText(path: string): Promise<string> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, 'BACKEND OFFLINE — cannot reach server');
+  }
+  if (res.status === 401) {
+    setToken(null);
+    window.dispatchEvent(new CustomEvent('ts:unauthorized'));
+    throw new ApiError(401, 'Session expired — please sign in again');
+  }
+  const text = await res.text();
+  if (!res.ok) {
+    let detail = `Request failed (${res.status})`;
+    try {
+      detail = (JSON.parse(text) as { detail?: string }).detail ?? detail;
+    } catch { /* not JSON — keep generic message */ }
+    throw new ApiError(res.status, detail);
+  }
+  return text;
 }
 
 export const api = {
@@ -252,4 +288,81 @@ export const api = {
     request<{ history: RouteHistoryRow[]; recent_in_memory: RouteHistoryRow[] }>(
       `/api/routes/history?limit=${limit}`),
   routeDetail: (routeId: string) => request<RoutePlan>(`/api/routes/${routeId}`),
+
+  // Phase 9 §60 — server-side analytics aggregation
+  analyticsOverview: (params?: { range?: string; start?: string; end?: string }) =>
+    request<OverviewResponse>(`/api/analytics/overview${query(params)}`),
+  riskAnalytics: (params?: { range?: string; start?: string; end?: string;
+                             building_id?: string }) =>
+    request<RiskAnalyticsResponse>(`/api/analytics/risk${query(params)}`),
+  occupancyAnalytics: (params?: { range?: string; start?: string; end?: string;
+                                  building_id?: string }) =>
+    request<OccupancyAnalyticsResponse>(`/api/analytics/occupancy${query(params)}`),
+  energyAnalytics: (params?: { range?: string; start?: string; end?: string;
+                               building_id?: string }) =>
+    request<EnergyAnalyticsResponse>(`/api/analytics/energy${query(params)}`),
+  environmentAnalytics: (params?: { range?: string; start?: string; end?: string;
+                                    building_id?: string }) =>
+    request<EnvironmentAnalyticsResponse>(`/api/analytics/environment${query(params)}`),
+  sensorHealth: (params?: { range?: string; start?: string; end?: string }) =>
+    request<SensorHealthResponse>(`/api/analytics/sensors${query(params)}`),
+  sensorHealthDetail: (id: string, params?: { range?: string; start?: string; end?: string }) =>
+    request<SensorHealthDetailResponse>(
+      `/api/analytics/sensors/${encodeURIComponent(id)}${query(params)}`),
+  buildingsAnalytics: (params?: { range?: string; start?: string; end?: string }) =>
+    request<BuildingsAnalyticsResponse>(`/api/analytics/buildings${query(params)}`),
+  buildingAnalytics: (id: string, params?: { range?: string; start?: string; end?: string }) =>
+    request<BuildingAnalyticsDetailResponse>(
+      `/api/analytics/buildings/${encodeURIComponent(id)}${query(params)}`),
+  compareBuildings: (ids: string, params?: { range?: string; start?: string; end?: string }) =>
+    request<BuildingsCompareResponse>(
+      `/api/analytics/buildings/compare${query({ ids, ...params })}`),
+  routesAnalytics: (params?: { range?: string; start?: string; end?: string }) =>
+    request<RoutesAnalyticsResponse>(`/api/analytics/routes${query(params)}`),
+  aiAnalytics: (params?: { range?: string; start?: string; end?: string }) =>
+    request<AiAnalyticsResponse>(`/api/analytics/ai${query(params)}`),
+  analyticsSystem: () => request<SystemStatusResponse>('/api/analytics/system'),
+  campusHealth: (params?: { range?: string; start?: string; end?: string }) =>
+    request<CampusHealthResponse>(`/api/analytics/health${query(params)}`),
+  whatChanged: (ago = 60) =>
+    request<WhatChangedResponse>(`/api/analytics/what-changed${query({ ago })}`),
+  exportAnalytics: (kind: string, params?: { range?: string; start?: string; end?: string }) =>
+    requestText(`/api/analytics/export${query({ kind, ...params })}`),
+
+  // Phase 9 §62 — historical intelligence
+  historyIncidents: (params?: { page?: number; page_size?: number; status?: string;
+                                severity?: string; kind?: string; building_id?: string;
+                                simulation_id?: string; q?: string; sort?: string;
+                                order?: string }) =>
+    request<IncidentListResponse>(`/api/history/incidents${query(params)}`),
+  historyIncident: (id: string) =>
+    request<IncidentDetailResponse>(`/api/history/incidents/${encodeURIComponent(id)}`),
+  incidentReport: (id: string) =>
+    request<IncidentReportResponse>(
+      `/api/history/incidents/${encodeURIComponent(id)}/report`),
+  incidentExport: (id: string, format: 'csv' | 'json' = 'csv') =>
+    requestText(
+      `/api/history/incidents/${encodeURIComponent(id)}/export${query({ format })}`),
+  historySimulations: (params?: { page?: number; page_size?: number; scenario?: string;
+                                  status?: string; severity?: string; q?: string;
+                                  sort?: string; order?: string }) =>
+    request<SimulationListResponse>(`/api/history/simulations${query(params)}`),
+  historySimulation: (id: string) =>
+    request<SimulationDetailResponse>(
+      `/api/history/simulations/${encodeURIComponent(id)}`),
+  historySimEvents: (id: string) =>
+    request<SimulationEventsResponse>(
+      `/api/history/simulations/${encodeURIComponent(id)}/events`),
+  compareSimulations: (a: string, b: string) =>
+    request<SimulationCompareResponse>(
+      `/api/history/simulations/compare${query({ a, b })}`),
+  historyExport: (kind: string, params?: { range?: string; page_size?: number }) =>
+    requestText(`/api/history/export${query({ kind, ...params })}`),
+
+  // Phase 9 §63 — simulation replay
+  replay: (id: string) =>
+    request<ReplayPayload>(`/api/history/simulations/${encodeURIComponent(id)}/replay`),
+  replayFrame: (id: string, t: number) =>
+    request<ReplayFrame>(
+      `/api/history/simulations/${encodeURIComponent(id)}/frame${query({ t })}`),
 };

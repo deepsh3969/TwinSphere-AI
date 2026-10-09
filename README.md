@@ -140,12 +140,12 @@ one-click reset between runs.
 |---|---|
 | `/` | Product overview + architecture diagram |
 | `/login` | Role-based sign-in with one-click demo credentials |
-| `/dashboard` | Command Center: live 3D campus, risk gauge, AI rail, metric strip, event ticker |
+| `/dashboard` | Command Center: live 3D campus, risk gauge, AI rail, metric strip, event ticker, **server-computed KPI strip with trends**, **system-health bottom bar**, **campus health score + What Changed?**, **replay mode (`?replay=<simId>`)** with transport controls + LIVE/REPLAY banner |
 | `/twin` | 3D Twin Explorer: camera presets, layer toggles (**incl. Risk**), building/road/exit inspector, live tab (system status + event timeline), realtime sim controls, **RISK MODE** (buildings tinted by published risk), **routes tab + Routes & Evacuation panel** (Phase 7) |
 | `/simulation` | 5 scenario cards, ignition-zone/intensity/wind controls, start/pause/resume/reset/recover, live metrics (people · risk · zones · temp · smoke · speed), results panel, speed chips, demo drill |
 | `/ai` | Published (stabilised) campus risk, risk by building, predictions with honest confidence, anomalies with band/severity filters, AI events, **Operations Analyst with the Phase 8 structured brief** (severity · confidence meter · what-changed · route assessment · grounding evidence · recommendation decisions) + **analyst status pill**, mandatory AI-limitations disclaimer |
-| `/analytics` | 1H–30D Recharts time series: occupancy, forecast, energy, risk, temperature, incidents |
-| `/history` | Persisted simulation records with expandable event logs |
+| `/analytics` | Full analytics workspace: 15M–30D + custom windows, building/zone/metric/incident/simulation filters (**URL-persisted**), server-side aggregation (risk bands, occupancy, energy, environment, sensor health, buildings, routes, AI, campus health, incidents, simulations), building compare, **CSV export** |
+| `/history` | Historical intelligence: **Incidents \| Simulations tabs** with server-side pagination/filters (URL-persisted), incident detail drawer (timeline · metrics · **report** · CSV export), simulation detail (metrics · events · linked incidents), **two-run compare**, **Replay button → `/dashboard?replay=<simId>`** |
 | `/settings` | Clock speed, sensor tick, system health, display defaults, demo reset |
 
 **Scenarios:** Fire Emergency (330 s + 130 s recovery) · Crowd Surge · Power Failure · Road Closure ·
@@ -229,6 +229,27 @@ GET  /api/routes/emergency · /api/emergency-response/routes
 GET  /api/routes/bottlenecks       structured capacity bottlenecks
 GET  /api/routes/history?limit=    persisted route_events audit (survives resets)
 GET  /api/routes/{route_id}        active plan first, then persisted row + events
+GET  /api/analytics/overview|risk|occupancy|energy|environment|sensors
+                                   Phase 9: window aggregates (?range=15M|1H|6H|24H|7D|30D
+                                   |CUSTOM&start=&end= · building_id on risk/occupancy/
+                                   energy/environment) → KPI trends · risk bands · series
+GET  /api/analytics/buildings · /buildings/{id} · /buildings/compare?ids=
+                                   building rows · per-building detail (risk+occupancy+
+                                   environment+incidents+sensors) · 2–3 building compare
+GET  /api/analytics/sensors/{id}   sensor health detail (series · stats · trend)
+GET  /api/analytics/routes · /ai · /system · /health · /what-changed?ago=
+                                   route/AI aggregates · system components · campus health
+                                   score · what changed since N minutes ago (honest
+                                   unavailable reasons — never fabricated)
+GET  /api/analytics/export?kind=&range=&start=&end=&format=   CSV download
+GET  /api/history/incidents?status=&severity=&kind=&q=&page=  paginated incidents
+GET  /api/history/incidents/{id} · /report · /export?format=  detail · report · CSV
+GET  /api/history/simulations?scenario=&status=&q=&page=      paginated simulations
+GET  /api/history/simulations/{id} · /events · /compare?a=&b= detail · events · 2-run diff
+GET  /api/history/simulations/{id}/replay · /frame?t=         Phase 9: replay payload
+                                   (frames · events · risk series · route/AI/incident
+                                   context · speeds) + single deterministic frame
+GET  /api/history/export?kind=     history CSV (incidents | simulations)
 ```
 
 ---
@@ -793,6 +814,105 @@ npm run test                                            # vitest → 97 passed (
 
 ---
 
+## Phase 9 — Command Center, Analytics & Historical Intelligence
+
+Everything the platform has persisted — risk scores, occupancy, readings, route
+events, AI analyses, incidents, simulations — is now queryable as **server-side
+aggregated analytics**, presented as a professional command center, a full
+analytics workspace, a historical intelligence page and **deterministic
+simulation replay**. No new chart library, no fake data: every series comes from
+persisted rows, and empty windows report `available: false` with a reason.
+
+```mermaid
+flowchart LR
+    DB[(SQLite · indexed<br/>risk_scores · occupancy_records ·<br/>sensor_readings · route_events ·<br/>ai_analyses · incidents · simulations ·<br/>simulation_events)] --> AGG[analytics_service.py<br/>window + bucket + trend + honesty]
+    AGG --> RA[routes_analytics.py<br/>17 endpoints · role read]
+    DB --> HS[history_service.py<br/>lists · detail · report · compare]
+    HS --> RH[routes_history.py<br/>11 endpoints · role read]
+    DB --> RP[replay_service.py<br/>WallClockMap · frames · events]
+    RP --> RF["/replay · /frame?t="]
+    RA --> AN[/analytics workspace<br/>URL state + CSV export/]
+    RA --> DB2[/dashboard KPI strip ·<br/>system-health bar · What Changed?/]
+    RH --> HI[/history tabs<br/>detail · report · compare/]
+    RF --> RE[Replay transport<br/>PLAY/PAUSE/RESET · 0.5–10x<br/>replay slice ≠ live state]
+    RE --> DB2
+```
+
+### Aggregation & honesty (`backend/app/services/analytics_service.py`)
+
+- **Windows** — `15M | 1H | 6H | 24H | 7D | 30D | CUSTOM(start,end)`; every
+  response echoes `window/source/computed_at`. SQLite bucket SQL uses
+  `literal_column` (SQLAlchemy would otherwise compile `/` as `a / (? + 0.0)`).
+- **Risk bands (5)** — `RISK_BANDS` mirrors `state.risk_level()`:
+  LOW ≤20 · MODERATE ≤40 · ELEVATED ≤60 · HIGH ≤80 · CRITICAL;
+  `RISK_KPI_STATUS` maps MODERATE/ELEVATED→WARN, HIGH/CRITICAL→CRITICAL.
+  `_time_in_categories` reports exactly these five categories.
+- **Trends** — every block carries `TrendBlock{direction,delta,delta_pct,label,
+  available}`; unavailable when a window has <2 points (no fabricated deltas).
+- **Honesty** — no rows in window → `available: false` + `reason`; series are
+  never interpolated. `ENV_METRICS` order: temperature, humidity, air_quality,
+  smoke, water. CSV `EXPORT_KINDS`: summary, risk, occupancy, energy,
+  sensor_health, buildings, routes, incidents, simulations.
+
+### History & replay (`history_service.py` · `replay_service.py`)
+
+- **Incidents/simulations** — server-side pagination (`page/page_size/pages`),
+  filters (status/severity/kind/q/building · scenario/status/q), detail with
+  metrics + timeline, `report` (executive summary · timeline categories ·
+  contributing factors · response actions), 2-simulation compare, CSV export.
+- **Replay** — `build_replay()` assembles `frames` (≤500, evenly stepped),
+  persisted `events`, `risk_series`, route/AI/incident context and a
+  `WallClockMap` (tz-normalized) mapping sim-t → wall-clock;
+  `replay_frame(id, t)` returns the same frame deterministically.
+  `LIFECYCLE_STATUS` maps lifecycle kinds → CREATED/RUNNING/PAUSED/RECOVERING/
+  AWAITING_RECOVERY/RECOVERED/COMPLETED.
+- **Indexes (migration `p9f3c8d2e7b1`)** — 6 indexes over the aggregation
+  columns (time+entity risk, readings by time, occupancy by time, incidents
+  by status/started, simulations by status/created, simulation_events by sim+t).
+
+### Frontend
+
+- **`/dashboard`** — `components/dashboard/KpiStrip.tsx` (window KPIs +
+  sparklines from `GET /analytics/overview`), `SystemHealthBar.tsx` (9
+  components, 30 s refresh), `HealthChangesPanel.tsx` (campus health score +
+  What Changed?), right-rail `ai|health` tabs, and replay mode driven by
+  `?replay=<simId>` (sim card replaced by `ReplayControls`, `ReplayBanner`
+  shows LIVE/REPLAY; exiting clears the URL param).
+- **`/analytics`** — all filters live in the URL (`range,start,end,building,
+  zone,metric,kind,status,severity,q,scenario,compare`) so views are shareable
+  and refresh-safe; sections render server-computed blocks only;
+  `utils/download.ts` handles authenticated CSV downloads.
+- **`/history`** — Incidents | Simulations tabs (URL `tab` + filters +
+  pagination), incident drawer (timeline · metrics · report · CSV), simulation
+  drawer (metrics · events-by-category · linked incidents), 2-run compare
+  panel, **Replay** buttons that navigate to `/dashboard?replay=<id>`.
+- **Replay store slice** (`useTwinStore`) — `loadReplay/closeReplay/
+  setReplayT/setReplaySpeed/setReplayPlaying/stepReplay/tickReplay` plus a
+  derived `replaySnapshot`: topology from the live base, all dynamic values
+  strictly from the persisted frame. `CampusScene` renders
+  `replaySnapshot ?? snapshot`, so **replay never mutates live state**.
+
+### Phase 9 tests
+
+```powershell
+cd backend
+.venv\Scripts\python -m pytest tests -q                 # 191 passed (156 + 35 Phase 9)
+.venv\Scripts\python tests\smoke_api.py                 # 180/180 (server must be running)
+.venv\Scripts\python tests\ws_check.py                  # 48/48
+
+cd frontend
+npm run typecheck && npm run build
+npm run test                                            # vitest → 152 passed (97 + 55 Phase 9)
+```
+
+Covers §60 endpoint behaviour (windows, bands, honesty, RBAC, CSV), §61 replay
+determinism (same t → same frame; frame-derived state; source honesty) and §62
+UI (replay store/transport/banner, History tabs/drawers/compare/replay
+hand-off, Analytics URL state + export) against **captured real API responses**
+(`frontend/src/testData/`).
+
+---
+
 ## Testing
 
 ```powershell
@@ -800,15 +920,15 @@ npm run test                                            # vitest → 97 passed (
 cd backend
 $env:PYTHONPATH = (Resolve-Path ..).Path
 .venv\Scripts\python -m uvicorn app.main:app --port 8000     # terminal 1
-.venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 147/147
+.venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 180/180
 
-.venv\Scripts\python -m pytest tests -q                       # unit/integration → 156 passed
+.venv\Scripts\python -m pytest tests -q                       # unit/integration → 191 passed
 .venv\Scripts\python tests\ws_check.py                        # WebSocket checks → 48/48
 
 # Frontend
 cd frontend
 npm run typecheck && npm run build
-npm run test                               # vitest: utils + store + panels + twin/AI/analyst pages → 97 passed
+npm run test                               # vitest: utils + store + panels + twin/AI/analyst/history/analytics/replay → 152 passed
 ```
 
 ---
@@ -819,13 +939,13 @@ npm run test                               # vitest: utils + store + panels + tw
 TwinSphere-AI/
 ├── backend/            FastAPI app: API, auth, WebSocket, runtime loop, services
 │   ├── app/{api,core,models,services,schemas,websocket}
-│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst)
+│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst → p9f3c8d2e7b1 analytics indexes)
 │   └── tests/          smoke_api.py · ws_check.py · pytest suite (incl. Phase 2 tests)
 ├── ai/                 Deterministic + ML engines: risk, prediction, anomaly, simulation, optimization, analyst
 ├── frontend/           React 18 · Vite · Tailwind v4 · Three.js/R3F · Recharts · Zustand · Vitest
 ├── database/           (SQLite file lives in backend/ by default; this dir is for external DB artifacts)
 ├── simulation-data/    Exported campus_model.json + sensor_history.csv (generated at seed time)
-├── docs/               architecture.md · api.md · AI_ANALYST.md · ROUTING.md · simulation.md
+├── docs/               architecture.md · api.md · AI_ANALYST.md · ROUTING.md · simulation.md · ANALYTICS.md · REPLAY.md
 ├── docker-compose.yml  backend + frontend (+ optional postgres profile)
 └── .env.example        Environment contract
 ```

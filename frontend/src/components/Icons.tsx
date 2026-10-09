@@ -80,3 +80,6 @@ export const IconMenu = (p: P) => (
 export const IconSearch = (p: P) => (
   <svg {...base(p)}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
 );
+export const IconDownload = (p: P) => (
+  <svg {...base(p)}><path d="M12 3v12" /><path d="M7 11l5 5 5-5" /><path d="M4 21h16" /></svg>
+);

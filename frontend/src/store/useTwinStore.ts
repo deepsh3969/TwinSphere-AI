@@ -4,10 +4,11 @@ import { TwinSocket } from '../services/ws';
 import type {
   ActiveSim, AIEvent, AnalystReport, AnalystStatus, Anomaly, BuildingDetail,
   BuildingEvacuationPlan, ConnectionStatus, EmergencyRoutePlan, EvacuationOverview,
-  EvacuationStatus, LiveLogEntry, LivePoint, MetricSample, Prediction, PublishedRisk,
-  RealtimeStatus, RiskLevel, Route, RouteAlternativesResponse, RouteBottleneck,
-  RouteHistoryRow, RouteMode, RoutePlan, Sensor, SensorAiStatus, SensorHistory,
-  SimEvent, Snapshot, SimHistoryItem, SystemStatusInfo, User, Zone,
+  EvacuationStatus, Incident, LiveLogEntry, LivePoint, MetricSample, Prediction,
+  PublishedRisk, RealtimeStatus, ReplayFrame, ReplayPayload, RiskLevel, RiskResult,
+  Route, RouteAlternativesResponse, RouteBottleneck, RouteHistoryRow, RouteMode,
+  RoutePlan, Sensor, SensorAiStatus, SensorHistory, SimEvent, SimStatus, Snapshot,
+  SimHistoryItem, SystemStatusInfo, User, Zone,
 } from '../types';
 import { VIEW_MODE_LAYERS, type SensorFilter, type ViewMode } from '../types/twin';
 
@@ -111,6 +112,17 @@ interface TwinStore {
   routeError: string | null;
   routePanelOpen: boolean;
 
+  // Phase 9 §63 — simulation replay (separate from live state)
+  replay: ReplayPayload | null;
+  replaySimId: string | null;
+  replayT: number;
+  replayPlaying: boolean;
+  replaySpeed: number;
+  replayLoading: boolean;
+  replayError: string | null;
+  /** Derived 3D view for the active replay — CampusScene renders this instead of live. */
+  replaySnapshot: Snapshot | null;
+
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   boot: () => Promise<void>;
@@ -149,6 +161,14 @@ interface TwinStore {
   loadEmergencyRoutes: () => Promise<void>;
   refreshRouteHistory: () => Promise<void>;
   setRoutePanelOpen: (open: boolean) => void;
+  // Phase 9 §63 — replay actions
+  loadReplay: (simId: string) => Promise<void>;
+  closeReplay: () => void;
+  setReplayT: (t: number) => void;
+  setReplaySpeed: (speed: number) => void;
+  setReplayPlaying: (playing: boolean) => void;
+  stepReplay: (dir: -1 | 1) => void;
+  tickReplay: (dtSeconds: number) => void;
 }
 
 let socket: TwinSocket | null = null;
@@ -280,6 +300,147 @@ function mergeSnapshot(prev: Snapshot | null, payload: Snapshot): Snapshot {
   return merged as unknown as Snapshot;
 }
 
+// ---- Phase 9 §63 — replay helpers ------------------------------------------
+/** Risk band matching backend `state.risk_level` thresholds. */
+function riskBand(score: number): RiskLevel {
+  if (score <= 20) return 'LOW';
+  if (score <= 40) return 'MODERATE';
+  if (score <= 60) return 'ELEVATED';
+  if (score <= 80) return 'HIGH';
+  return 'CRITICAL';
+}
+
+/** Last frame at or before `t` (first frame as fallback for t before start). */
+export function frameAt(frames: ReplayFrame[], t: number): ReplayFrame | null {
+  if (!frames.length) return null;
+  let best = frames[0];
+  for (const f of frames) {
+    if (f.t <= t + 1e-6) best = f;
+    else break;
+  }
+  return best;
+}
+
+/**
+ * Derive a render snapshot for replay time `t` from persisted frames.
+ * Topology comes from the live base; dynamic fields are replaced strictly
+ * from the frame (persisted events/risk/occupancy) — never synthesised.
+ */
+function buildReplaySnapshot(base: Snapshot | null, payload: ReplayPayload,
+                             t: number): Snapshot | null {
+  if (!base) return null;
+  const frame = frameAt(payload.frames, t);
+  if (!frame) return null;
+
+  const burning = new Set(frame.burning_zones);
+  const frac = Math.max(0, Math.min(1, frame.fire_fraction));
+  const zones = base.zones.map((z) => {
+    if (burning.has(z.id)) {
+      return { ...z, fire: Math.max(0.4, frac), smoke: Math.max(z.smoke, 1 + 5 * frac),
+               status: 'FIRE' as const };
+    }
+    if (z.fire > 0 || z.smoke > 4 || z.status !== 'NORMAL') {
+      return { ...z, fire: 0, smoke: 0, status: 'NORMAL' as const };
+    }
+    return z;
+  });
+
+  const campusScore = frame.risk.campus;
+  const risk: RiskResult = typeof campusScore === 'number'
+    ? { ...base.risk, score: campusScore, level: riskBand(campusScore) }
+    : base.risk;
+
+  const buildingRisk: Record<string, RiskResult> = { ...base.building_risk };
+  for (const [entity, score] of Object.entries(frame.risk)) {
+    if (entity === 'campus' || typeof score !== 'number') continue;
+    const prev = buildingRisk[entity];
+    buildingRisk[entity] = {
+      score, level: riskBand(score),
+      factors: prev?.factors ?? [],
+      explanation: prev?.explanation ?? '',
+    };
+  }
+
+  const sim = payload.simulation;
+  const simStatuses = ['CREATED', 'RUNNING', 'PAUSED', 'AWAITING_RECOVERY',
+                       'RECOVERING', 'COMPLETED', 'RESET'];
+  const active: ActiveSim = {
+    id: sim.id,
+    simulation_code: sim.code,
+    scenario: sim.scenario,
+    target_id: sim.target_id,
+    target_type: undefined,
+    params: {},
+    status: (simStatuses.includes(sim.status) ? sim.status : 'RUNNING') as ActiveSim['status'],
+    t: frame.t,
+    duration: payload.duration_s,
+    progress: payload.duration_s > 0
+      ? Math.min(100, (frame.t / payload.duration_s) * 100) : 100,
+    peak_risk: sim.peak_risk,
+    people_at_risk: frame.people_at_risk,
+    phase: frame.last_kind.replace(/_/g, ' '),
+    events: payload.events.map((e) => ({ t: e.t, kind: e.kind, message: e.message })),
+    recover_t: 0,
+    recover_duration: sim.recovery_time_s,
+  };
+
+  const incidents: Incident[] = payload.incidents
+    .filter((i) => i.start_t !== null && i.start_t <= frame.t + 1e-6
+      && (i.end_t === null || i.end_t >= frame.t - 1e-6))
+    .map((i) => ({
+      id: i.id,
+      incident_code: i.code,
+      title: i.title,
+      kind: i.kind,
+      building_id: null,
+      severity: i.severity,
+      status: 'ACTIVE',
+      description: '',
+      risk_score: 0,
+      started_at: i.started_wall ?? '',
+      resolved_at: i.resolved_wall,
+    }));
+
+  const wallMs = frame.wall ? Date.parse(frame.wall) : Number.NaN;
+  const wallDate = Number.isNaN(wallMs) ? null : new Date(wallMs);
+  const clock_hour = wallDate
+    ? wallDate.getUTCHours() + wallDate.getUTCMinutes() / 60
+    : base.clock_hour;
+
+  const occ = frame.occupancy;
+  const occupancy = occ ?? base.metrics.occupancy;
+  const occupancy_pct = occ !== null && base.metrics.occupancy > 0
+    && base.metrics.occupancy_pct > 0
+    ? (occ * base.metrics.occupancy_pct) / base.metrics.occupancy
+    : base.metrics.occupancy_pct;
+
+  const simStatus: SimStatus = frame.status === 'RUNNING' ? 'RUNNING'
+    : frame.status === 'PAUSED' ? 'PAUSED' : 'STOPPED';
+
+  return {
+    ...base,
+    clock_hour,
+    sim_status: simStatus,
+    status: frame.status,
+    zones,
+    incidents,
+    risk,
+    building_risk: buildingRisk,
+    metrics: {
+      ...base.metrics,
+      occupancy,
+      occupancy_pct,
+      risk: risk.score,
+      risk_level: risk.level,
+      incidents: incidents.length,
+      people_at_risk: frame.people_at_risk,
+      clock_hour,
+      status: frame.status,
+    },
+    active_sim: active,
+  };
+}
+
 export const useTwinStore = create<TwinStore>((set, get) => ({
   token: getToken(),
   user: null,
@@ -353,6 +514,15 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
   routeLoading: false,
   routeError: null,
   routePanelOpen: false,
+
+  replay: null,
+  replaySimId: null,
+  replayT: 0,
+  replayPlaying: false,
+  replaySpeed: 1,
+  replayLoading: false,
+  replayError: null,
+  replaySnapshot: null,
 
   async login(username, password) {
     set({ authLoading: true, authError: null });
@@ -1126,6 +1296,98 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
 
   setRoutePanelOpen(open) {
     set({ routePanelOpen: open });
+  },
+
+  // ---- Phase 9 §63 — simulation replay ----
+  async loadReplay(simId) {
+    set({ replayLoading: true, replayError: null, replayPlaying: false });
+    try {
+      const payload = await api.replay(simId);
+      set({
+        replay: payload,
+        replaySimId: simId,
+        replayT: 0,
+        replayLoading: false,
+        replaySnapshot: buildReplaySnapshot(get().snapshot, payload, 0),
+      });
+    } catch (err) {
+      set({
+        replayLoading: false,
+        replayError: err instanceof ApiError ? err.message : 'Failed to load replay',
+        replay: null,
+        replaySimId: null,
+        replaySnapshot: null,
+      });
+    }
+  },
+
+  closeReplay() {
+    set({
+      replay: null,
+      replaySimId: null,
+      replayT: 0,
+      replayPlaying: false,
+      replayError: null,
+      replayLoading: false,
+      replaySnapshot: null,
+    });
+  },
+
+  setReplayT(t) {
+    const payload = get().replay;
+    if (!payload) return;
+    const clamped = Math.max(0, Math.min(payload.duration_s, t));
+    set({
+      replayT: clamped,
+      replaySnapshot: buildReplaySnapshot(get().snapshot, payload, clamped),
+    });
+  },
+
+  setReplaySpeed(speed) {
+    set({ replaySpeed: speed });
+  },
+
+  setReplayPlaying(playing) {
+    const payload = get().replay;
+    if (!payload) {
+      set({ replayPlaying: false });
+      return;
+    }
+    // pressing PLAY at the end rewinds to the start
+    const atEnd = get().replayT >= payload.duration_s - 1e-6;
+    const t = playing && atEnd ? 0 : get().replayT;
+    set({
+      replayPlaying: playing,
+      replayT: t,
+      replaySnapshot: buildReplaySnapshot(get().snapshot, payload, t),
+    });
+  },
+
+  stepReplay(dir) {
+    const payload = get().replay;
+    if (!payload) return;
+    const step = Math.max(payload.frame_step_s, 1);
+    set({ replayPlaying: false });
+    get().setReplayT(get().replayT + dir * step);
+  },
+
+  tickReplay(dt) {
+    const st = get();
+    const payload = st.replay;
+    if (!st.replayPlaying || !payload || dt <= 0) return;
+    const next = st.replayT + dt * st.replaySpeed;
+    if (next >= payload.duration_s) {
+      set({
+        replayT: payload.duration_s,
+        replayPlaying: false,
+        replaySnapshot: buildReplaySnapshot(st.snapshot, payload, payload.duration_s),
+      });
+      return;
+    }
+    set({
+      replayT: next,
+      replaySnapshot: buildReplaySnapshot(st.snapshot, payload, next),
+    });
   },
 
   async realtimeAction(action) {

@@ -575,6 +575,220 @@ def main():
           and bd7.json().get("building_id") == "eng"
           and bd7.json().get("primary_exit"), bd7.text[:200])
 
+    # Phase 9 — command center, analytics and historical intelligence
+    ov = c.get("/api/analytics/overview?range=24H", headers=hdr)
+    ovj = ov.json() if ov.status_code == 200 else {}
+    kpi_ids = {k["id"] for k in ovj.get("kpis", [])}
+    check("analytics overview kpis",
+          ov.status_code == 200 and
+          {"occupancy", "energy", "risk", "incidents", "predictions", "sensors"} <= kpi_ids
+          and all(k["trend"]["direction"] in ("up", "down", "flat") for k in ovj["kpis"])
+          and ovj.get("window", {}).get("preset") == "24H"
+          and ovj.get("source") and ovj.get("computed_at"),
+          (ov.status_code, sorted(kpi_ids), ovj.get("window")))
+    check("overview risk kpi band + status",
+          next((k for k in ovj["kpis"] if k["id"] == "risk"), {}).get("secondary")
+          in ("LOW", "MODERATE", "ELEVATED", "HIGH", "CRITICAL"),
+          [k for k in ovj["kpis"] if k["id"] == "risk"])
+    ov15 = c.get("/api/analytics/overview?range=15M", headers=hdr)
+    ov7 = c.get("/api/analytics/overview?range=7D", headers=hdr)
+    check("overview range variants",
+          ov15.status_code == 200 and ov7.status_code == 200
+          and ov15.json()["window"]["preset"] == "15M"
+          and ov7.json()["window"]["preset"] == "7D",
+          (ov15.status_code, ov7.status_code))
+
+    risk9 = c.get("/api/analytics/risk?range=24H", headers=hdr).json()
+    check("analytics risk shape",
+          risk9.get("available") is True and risk9.get("entity") == "campus"
+          and 0 <= risk9.get("current", -1) <= 100
+          and [x["category"] for x in risk9["time_in_category"]]
+          == ["LOW", "MODERATE", "ELEVATED", "HIGH", "CRITICAL"]
+          and isinstance(risk9["critical_events"], list),
+          sorted(risk9))
+    rbee = c.get("/api/analytics/risk?building_id=eng&range=6H", headers=hdr).json()
+    check("analytics risk building", rbee.get("entity") == "eng"
+          and "heatmap" in rbee and rbee["heatmap"]["rows"], sorted(rbee))
+    empty9 = c.get("/api/analytics/risk?range=CUSTOM&start=2020-01-01T00:00:00Z"
+                   "&end=2020-01-02T00:00:00Z", headers=hdr).json()
+    check("analytics empty window honest",
+          empty9.get("available") is False and empty9.get("reason")
+          and empty9.get("series") == [], empty9)
+
+    occ9 = c.get("/api/analytics/occupancy?range=6H", headers=hdr).json()
+    check("analytics occupancy",
+          occ9.get("available") is True and len(occ9.get("by_building", [])) == 6
+          and occ9.get("capacity") and "peak" in occ9["stats"], sorted(occ9))
+    en9 = c.get("/api/analytics/energy?range=6H", headers=hdr).json()
+    check("analytics energy",
+          en9.get("available") is True and en9["stats"]["samples"] > 0
+          and en9["abnormal"]["count"] >= 0
+          and len(en9["by_building"]) == 6, sorted(en9))
+    env9 = c.get("/api/analytics/environment?range=1H", headers=hdr).json()
+    check("analytics environment metrics",
+          [m["metric"] for m in env9["metrics"]]
+          == ["temperature", "humidity", "air_quality", "smoke", "water"],
+          [m["metric"] for m in env9.get("metrics", [])])
+
+    sh9 = c.get("/api/analytics/sensors?range=24H", headers=hdr).json()
+    check("sensor health totals",
+          sh9["totals"]["total"] >= 40
+          and sh9["totals"]["online"] + sh9["totals"]["offline"] == sh9["totals"]["total"]
+          and sh9["status"] in ("HEALTHY", "DEGRADED", "UNHEALTHY")
+          and len(sh9["by_type"]) >= 9, sh9.get("totals"))
+    sd9 = c.get("/api/analytics/sensors/temperature_eng?range=6H", headers=hdr)
+    sd4 = c.get("/api/analytics/sensors/nope", headers=hdr)
+    check("sensor health detail + 404",
+          sd9.status_code == 200 and sd9.json()["sensor"]["type"] == "temperature"
+          and sd4.status_code == 404, (sd9.status_code, sd4.status_code))
+
+    bld9 = c.get("/api/analytics/buildings?range=24H", headers=hdr).json()
+    check("analytics buildings",
+          bld9["count"] == 6 and all(
+              {"id", "risk", "occupancy", "energy", "incidents", "sensor_health"}
+              <= set(b) for b in bld9["buildings"]), bld9["count"])
+    bd9 = c.get("/api/analytics/buildings/eng?range=24H", headers=hdr)
+    b49 = c.get("/api/analytics/buildings/nope", headers=hdr)
+    check("building analytics detail + 404",
+          bd9.status_code == 200 and {"building", "risk", "occupancy",
+                                      "environment", "incidents", "sensors"}
+          <= set(bd9.json()) and b49.status_code == 404,
+          (bd9.status_code, b49.status_code))
+    cmp9 = c.get("/api/analytics/buildings/compare?ids=eng,cs,lib&range=24H",
+                 headers=hdr).json()
+    check("buildings compare",
+          cmp9.get("available") is True and len(cmp9.get("rows", [])) >= 5
+          and all(0 <= cell["norm"] <= 100
+                  for row in cmp9["rows"] for cell in row["values"].values()
+                  if cell["raw"] is not None), len(cmp9.get("rows", [])))
+
+    rt9 = c.get("/api/analytics/routes?range=24H", headers=hdr).json()
+    check("routes analytics",
+          {"stats", "series", "current"} <= set(rt9)
+          and {"active_routes", "route_version", "mode"} <= set(rt9["current"])
+          and "by_event" in rt9["stats"], sorted(rt9))
+    ai9 = c.get("/api/analytics/ai?range=30D", headers=hdr).json()
+    check("ai analytics",
+          {"stats", "engine", "series"} <= set(ai9)
+          and {"analyst", "ai", "anomalies"} <= set(ai9["engine"]), sorted(ai9))
+
+    sys9 = c.get("/api/analytics/system", headers=hdr).json()
+    comp_ids = {x["id"] for x in sys9["components"]}
+    check("system status components",
+          {"api", "database", "websocket", "simulation", "ai", "risk", "routes",
+           "sensors", "occupancy"} <= comp_ids
+          and sys9["summary"]["online"] + sys9["summary"]["degraded"]
+          + sys9["summary"]["offline"] == sys9["summary"]["total"]
+          and all(x["status"] in ("ONLINE", "DEGRADED", "OFFLINE")
+                  for x in sys9["components"]), sorted(comp_ids))
+    hl9 = c.get("/api/analytics/health?range=24H", headers=hdr).json()
+    check("campus health score",
+          0 <= hl9["score"] <= 100 and hl9["level"] in ("GOOD", "FAIR", "POOR")
+          and hl9["weights_total"] == 100 and len(hl9["components"]) >= 6,
+          (hl9["score"], hl9["level"]))
+
+    wc9 = c.get("/api/analytics/what-changed?ago=60", headers=hdr).json()
+    check("what changed rows",
+          len(wc9.get("rows", [])) >= 6 and wc9["ago_minutes"] == 60
+          and all({"metric", "previous", "current", "direction", "impact"}
+                  <= set(r) for r in wc9["rows"]),
+          len(wc9.get("rows", [])))
+    wc0 = c.get("/api/analytics/what-changed?ago=0", headers=hdr)
+    check("what changed clamps ago=0",
+          wc0.status_code == 200 and wc0.json()["ago_minutes"] == 1,
+          (wc0.status_code, wc0.text[:160]))
+
+    exp9 = c.get("/api/analytics/export?kind=summary&range=24H", headers=hdr)
+    expb = c.get("/api/analytics/export?kind=nope", headers=hdr)
+    check("analytics csv export + bad kind",
+          exp9.status_code == 200 and exp9.text.splitlines()[0].startswith("kpi,")
+          and expb.status_code == 400, (exp9.status_code, expb.status_code))
+    ts9 = c.get("/api/analytics/timeseries?range=24H", headers=hdr)
+    check("legacy timeseries intact",
+          ts9.status_code == 200 and len(ts9.json().get("occupancy", [])) > 50,
+          ts9.status_code)
+
+    inc9 = c.get("/api/history/incidents?page=1&page_size=5", headers=hdr)
+    incj = inc9.json() if inc9.status_code == 200 else {}
+    check("history incidents list",
+          inc9.status_code == 200 and incj.get("total", 0) >= 3
+          and len(incj.get("items", [])) >= 3
+          and {"id", "code", "title", "severity", "status"} <= set(incj["items"][0]),
+          (inc9.status_code, incj.get("total")))
+    incm = c.get("/api/history/incidents?severity=MEDIUM", headers=hdr).json()
+    check("history incident filter",
+          incm["items"] and all(i["severity"] == "MEDIUM" for i in incm["items"]),
+          len(incm.get("items", [])))
+    incd = c.get("/api/history/incidents/inc_seed_1", headers=hdr)
+    check("history incident detail + 404",
+          incd.status_code == 200
+          and {"incident", "timeline", "metrics"} <= set(incd.json())
+          and c.get("/api/history/incidents/nope", headers=hdr).status_code == 404,
+          incd.status_code)
+    incr = c.get("/api/history/incidents/inc_seed_1/report", headers=hdr)
+    ince = c.get("/api/history/incidents/inc_seed_1/export?format=csv", headers=hdr)
+    check("incident report + export",
+          incr.status_code == 200
+          and incr.json()["report_type"] == "INCIDENT_REPORT"
+          and incr.json()["executive_summary"]
+          and ince.status_code == 200
+          and ince.text.splitlines()[0].startswith("category,kind,time"),
+          (incr.status_code, ince.status_code))
+
+    sim9 = c.get("/api/history/simulations?page_size=10", headers=hdr)
+    simj = sim9.json() if sim9.status_code == 200 else {}
+    check("history simulations list",
+          sim9.status_code == 200 and simj.get("total", 0) >= 4
+          and {"id", "code", "scenario", "status", "events"} <= set(simj["items"][0]),
+          (sim9.status_code, simj.get("total")))
+    ev9 = c.get("/api/history/simulations/sim_seed_fire/events", headers=hdr)
+    evj = ev9.json() if ev9.status_code == 200 else {}
+    check("simulation events categorized",
+          ev9.status_code == 200 and evj.get("count") == 4
+          and [e["t"] for e in evj["events"]] == sorted(e["t"] for e in evj["events"])
+          and all(e.get("category") for e in evj["events"]), ev9.text[:200])
+    cmps = c.get("/api/history/simulations/compare?a=sim_seed_fire&b=sim_seed_crowd",
+                 headers=hdr)
+    check("simulation compare",
+          cmps.status_code == 200 and len(cmps.json().get("rows", [])) >= 10
+          and c.get("/api/history/simulations/compare?a=sim_seed_fire&b=nope",
+                    headers=hdr).status_code == 404, cmps.status_code)
+
+    rp9 = c.get("/api/history/simulations/sim_seed_fire/replay", headers=hdr)
+    rpj = rp9.json() if rp9.status_code == 200 else {}
+    frames = rpj.get("frames", [])
+    check("replay payload",
+          rp9.status_code == 200
+          and {"simulation", "duration_s", "frames", "events", "speeds",
+               "zone_buildings", "source"} <= set(rpj)
+          and rpj["speeds"] == [0.5, 1.0, 2.0, 5.0, 10.0]
+          and len(frames) >= 2
+          and frames[0]["t"] == 0.0
+          and frames[-1]["t"] == rpj["duration_s"]
+          and [f["t"] for f in frames] == sorted(f["t"] for f in frames),
+          (rp9.status_code, len(frames)))
+    check("replay events match events endpoint",
+          [e["kind"] for e in rpj["events"]]
+          == [e["kind"] for e in evj["events"]] and len(rpj["events"]) == 4,
+          [e["kind"] for e in rpj.get("events", [])])
+    fr9 = c.get("/api/history/simulations/sim_seed_fire/frame?t=100", headers=hdr)
+    check("replay frame seek",
+          fr9.status_code == 200 and fr9.json()["t"] >= 100
+          and c.get("/api/history/simulations/nope/replay", headers=hdr).status_code == 404,
+          (fr9.status_code, fr9.text[:160]))
+    hx9 = c.get("/api/history/export?kind=simulations&range=30D", headers=hdr)
+    hxb = c.get("/api/history/export?kind=wat", headers=hdr)
+    check("history csv export + bad kind",
+          hx9.status_code == 200
+          and hx9.text.splitlines()[0].startswith("id,code,scenario")
+          and hxb.status_code == 400, (hx9.status_code, hxb.status_code))
+
+    n1 = c.get("/api/analytics/overview")
+    n2 = c.get("/api/history/incidents")
+    check("phase9 rbac 401",
+          n1.status_code == 401 and n2.status_code == 401,
+          (n1.status_code, n2.status_code))
+
     fails = [o for o in ok if not o[1]]
     print(f"\n{len(ok) - len(fails)}/{len(ok)} passed")
     if fails:

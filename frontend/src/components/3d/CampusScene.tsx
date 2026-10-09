@@ -101,7 +101,8 @@ function parseFloorNumber(floorId: string): number | null {
 }
 
 export default function CampusScene({ height = 'h-full' }: { height?: string }) {
-  const snapshot = useTwinStore((s) => s.snapshot);
+  // Phase 9 §63 — replay renders persisted frames; live is the default.
+  const snapshot = useTwinStore((s) => s.replaySnapshot ?? s.snapshot);
   const toggles = useTwinStore((s) => s.toggles);
   const selectBuilding = useTwinStore((s) => s.selectBuilding);
   const selectedId = useTwinStore((s) => s.selectedBuildingId);
