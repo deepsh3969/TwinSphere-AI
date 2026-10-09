@@ -12,6 +12,14 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend/ /app/backend/
 COPY ai/ /app/ai/
 
+# Phase 10 §18 — run unprivileged; /data is the SQLite volume mount point and
+# is initialized from this ownership on first `docker compose up`.
+RUN useradd --uid 1000 --shell /usr/sbin/nologin --no-create-home twinsphere \
+    && mkdir -p /data \
+    && chown -R twinsphere:twinsphere /app /data
+
+USER twinsphere
+
 WORKDIR /app/backend
 
 EXPOSE 8000

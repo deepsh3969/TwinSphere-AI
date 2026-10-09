@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import audit
 from app.core.database import get_db
-from app.core.security import require
+from app.core.security import has_permission, require
 from app.models.entities import EvacuationRoute, RouteEvent
 from app.schemas.common import RouteCalculate, RouteRecalculate
 from app.services import route_service as rs
@@ -164,11 +164,16 @@ def evacuation_status(principal: dict = Depends(require("read"))):
 @router.get("/evacuation/building/{building_id}")
 def building_evacuation(building_id: str, mode: str | None = None,
                         principal: dict = Depends(require("read"))):
-    """§15 — building plan: primary + alternatives + exit roles (activates plan)."""
+    """15 - building plan: primary + alternatives + exit roles.
+
+    Phase 10 §7: only roles with `apply` (ADMIN/OPERATOR) *activate* the plan;
+    VIEWER/ANALYST receive the computed plan without mutating the active state.
+    """
     state = get_state()
     _validate_mode(mode)
     try:
-        plan = rs.building_evacuation(state, building_id, mode=mode, activate=True)
+        plan = rs.building_evacuation(state, building_id, mode=mode,
+                                      activate=has_permission(principal, "apply"))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return plan
@@ -185,7 +190,8 @@ def emergency_routes(vehicle: str | None = None, origin: str | None = None,
         raise HTTPException(400, f"Unknown vehicle '{vehicle}'. Valid: {list(VEHICLE_KEYS)}")
     try:
         data = rs.emergency_routes(state, vehicle=vehicle, origin=origin,
-                                   destination=destination, activate=True)
+                                   destination=destination,
+                                   activate=has_permission(principal, "apply"))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return data

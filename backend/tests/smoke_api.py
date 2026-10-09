@@ -789,6 +789,116 @@ def main():
           n1.status_code == 401 and n2.status_code == 401,
           (n1.status_code, n2.status_code))
 
+    # ------------------------------------------------ Phase 10 - security
+    hh = c.get("/health").headers
+    check("security headers",
+          hh.get("x-content-type-options") == "nosniff"
+          and hh.get("x-frame-options") == "DENY"
+          and hh.get("referrer-policy") == "no-referrer"
+          and bool(hh.get("x-request-id")),
+          dict(hh))
+
+    me = c.get("/api/auth/me", headers=hdr)
+    mej = me.json() if me.status_code == 200 else {}
+    check("me returns safe profile",
+          me.status_code == 200 and mej.get("role") == "OPERATOR"
+          and "password_hash" not in me.text and "exp" not in mej,
+          (me.status_code, me.text[:160]))
+
+    # self-registration can never mint privileged roles
+    reg = c.post("/api/auth/register", json={
+        "username": "smoke_reg", "email": "smoke_reg@twinsphere.local",
+        "password": "smokePass123!", "role": "ADMIN"})
+    if reg.status_code in (200, 201):
+        reg_role = reg.json()["user"]["role"]
+    else:
+        rl = c.post("/api/auth/login", json={"username": "smoke_reg",
+                                             "password": "smokePass123!"})
+        reg_role = rl.json().get("user", {}).get("role") if rl.status_code == 200 else None
+        check("register disabled or exists", reg.status_code == 409, reg.text[:160])
+    check("register cannot self-assign ADMIN", reg_role == "VIEWER", reg_role)
+
+    # export permission: viewer denied, analyst allowed
+    vlg = c.post("/api/auth/login", json={"username": "viewer", "password": "viewer123"})
+    vhdr = {"Authorization": f"Bearer {vlg.json()['access_token']}"}
+    vexp = c.get("/api/analytics/export?kind=summary", headers=vhdr)
+    alg = c.post("/api/auth/login", json={"username": "analyst", "password": "analyst123"})
+    ahdr10 = {"Authorization": f"Bearer {alg.json()['access_token']}"}
+    aexp = c.get("/api/analytics/export?kind=summary", headers=ahdr10)
+    check("export requires export permission",
+          vexp.status_code == 403 and aexp.status_code == 200,
+          (vexp.status_code, aexp.status_code))
+
+    # audit access: operator operational subset, viewer denied, admin full
+    aop = c.get("/api/audit?page_size=5", headers=hdr)
+    avw = c.get("/api/audit", headers=vhdr)
+    admlg = c.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    adhdr = {"Authorization": f"Bearer {admlg.json()['access_token']}"}
+    adm_aud = c.get("/api/audit?page_size=5", headers=adhdr)
+    scope = adm_aud.json().get("scope") if adm_aud.status_code == 200 else None
+    check("audit rbac + scopes",
+          aop.status_code == 200 and aop.json().get("scope") == "operational"
+          and avw.status_code == 403 and adm_aud.status_code == 200 and scope == "full",
+          (aop.status_code, avw.status_code, adm_aud.status_code, scope))
+
+    # user administration
+    ul_v = c.get("/api/users", headers=vhdr)
+    ul_o = c.get("/api/users", headers=hdr)
+    ul_a = c.get("/api/users?page_size=5", headers=adhdr)
+    check("users admin-only",
+          ul_v.status_code == 403 and ul_o.status_code == 403 and ul_a.status_code == 200,
+          (ul_v.status_code, ul_o.status_code, ul_a.status_code))
+
+    last_admin = c.patch("/api/users/u_admin", json={"role": "VIEWER"}, headers=adhdr)
+    check("last-admin protection", last_admin.status_code == 409, last_admin.text[:160])
+
+    # disable -> blocked login + old token revoked; then re-enable
+    dis = c.patch("/api/users/u_operator", json={"is_active": False}, headers=adhdr)
+    dlogin = c.post("/api/auth/login", json={"username": "operator",
+                                             "password": "operator123"})
+    old_tok = c.get("/api/auth/me", headers=hdr)
+    ena = c.patch("/api/users/u_operator", json={"is_active": True}, headers=adhdr)
+    back = c.post("/api/auth/login", json={"username": "operator",
+                                           "password": "operator123"})
+    check("disable blocks login + revokes sessions; re-enable restores",
+          dis.status_code == 200 and dlogin.status_code == 403
+          and old_tok.status_code == 401 and ena.status_code == 200
+          and back.status_code == 200,
+          (dis.status_code, dlogin.status_code, old_tok.status_code,
+           ena.status_code, back.status_code))
+
+    # password change revokes the old session and returns a fresh token
+    clg = c.post("/api/auth/login", json={"username": "analyst",
+                                          "password": "analyst123"})
+    ctok = clg.json()["access_token"]
+    chdr = {"Authorization": f"Bearer {ctok}"}
+    chg = c.post("/api/auth/change-password",
+                 json={"current_password": "analyst123",
+                       "new_password": "analystPass456"}, headers=chdr)
+    old_ok = c.get("/api/auth/me", headers=chdr)
+    new_tok = chg.json().get("access_token", "")
+    new_ok = c.get("/api/auth/me", headers={"Authorization": f"Bearer {new_tok}"})
+    # restore the demo password for the next run
+    c.post("/api/auth/change-password",
+           json={"current_password": "analystPass456",
+                 "new_password": "analyst123"},
+           headers={"Authorization": f"Bearer {new_tok}"})
+    check("password change revokes sessions + issues new token",
+          chg.status_code == 200 and old_ok.status_code == 401
+          and new_ok.status_code == 200,
+          (chg.status_code, old_ok.status_code, new_ok.status_code))
+
+    # logout revokes server-side
+    llg = c.post("/api/auth/login", json={"username": "analyst",
+                                          "password": "analyst123"})
+    ltok = llg.json()["access_token"]
+    lhdr = {"Authorization": f"Bearer {ltok}"}
+    lo = c.post("/api/auth/logout", headers=lhdr)
+    lo2 = c.get("/api/auth/me", headers=lhdr)
+    check("logout revokes token",
+          lo.status_code == 200 and lo2.status_code == 401,
+          (lo.status_code, lo2.status_code))
+
     fails = [o for o in ok if not o[1]]
     print(f"\n{len(ok) - len(fails)}/{len(ok)} passed")
     if fails:

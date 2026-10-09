@@ -125,6 +125,9 @@ interface TwinStore {
 
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Phase 10 §11 — change own password; server revokes all sessions and
+   * returns a fresh token which becomes the active session. */
+  changePassword: (current_password: string, new_password: string) => Promise<void>;
   boot: () => Promise<void>;
   retryConnection: () => Promise<void>;
   setConnection: (s: ConnectionStatus) => void;
@@ -537,6 +540,9 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
   },
 
   logout() {
+    // Best-effort server-side revocation of the presented token (Phase 10 §5);
+    // local state is cleared regardless so a failed call cannot trap the user.
+    if (get().token) void api.logout().catch(() => { /* already invalid */ });
     setToken(null);
     socket?.disconnect();
     socket = null;
@@ -549,6 +555,16 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
       aiPredictions: [], aiEvents: [], aiStatus: null, aiDegraded: false,
       aiLastUpdated: 0, riskPublished: null, riskPublishedBuildings: {},
     });
+  },
+
+  async changePassword(current_password, new_password) {
+    const res = await api.changePassword(current_password, new_password);
+    setToken(res.access_token);
+    // Old tokens are revoked server-side — drop the socket so the next boot()
+    // reconnects with the fresh token (BootGate reacts to the token change).
+    socket?.disconnect();
+    socket = null;
+    set({ token: res.access_token });
   },
 
   async boot() {
@@ -573,6 +589,14 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
     };
     await pollHealth();
     if (!healthTimer) healthTimer = window.setInterval(pollHealth, 10000);
+
+    // Phase 10 — hydrate the authoritative profile (role can change server-side)
+    try {
+      const me = await api.me();
+      set({ user: me });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) return; // session dead
+    }
 
     try {
       const [campus, hist, rt] = await Promise.all([
@@ -1465,6 +1489,10 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
         get().pushToast('error', 'BACKEND OFFLINE', 'Cannot reach the TwinSphere API server.');
       } else if (err.status === 401) {
         get().pushToast('error', 'SESSION EXPIRED', 'Please sign in again.');
+      } else if (err.status === 403) {
+        get().pushToast('warn', 'ACCESS DENIED', err.message);
+      } else if (err.status === 429) {
+        get().pushToast('warn', 'RATE LIMITED', err.message);
       } else {
         get().pushToast('error', 'REQUEST FAILED', err.message);
       }

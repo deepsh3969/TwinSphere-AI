@@ -4,12 +4,11 @@ sqlalchemy==2.0.36
 alembic==1.14.1
 pydantic==2.10.4
 pydantic-settings==2.7.0
-PyJWT==2.10.1
+PyJWT==2.15.0
 numpy==2.2.1
 pandas==2.2.3
 scikit-learn==1.9.1
 python-dotenv==1.2.4
 psycopg2-binary==2.9.10
 httpx==0.28.1
-pytest==8.3.4
-pytest-asyncio==0.25.0
+argon2-cffi==25.1.0

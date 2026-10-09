@@ -11,6 +11,10 @@ if TEST_DB.exists():
     TEST_DB.unlink()
 os.environ.setdefault("DATABASE_URL", f"sqlite:///{TEST_DB}")
 os.environ.setdefault("RANDOM_SEED", "7")
+# Phase 10: rate limiting is exercised explicitly in test_phase10_security with
+# the limiter switched on; keep it off for the rest of the suite so repeated
+# logins across tests never trip per-IP buckets.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 import pytest  # noqa: E402
 

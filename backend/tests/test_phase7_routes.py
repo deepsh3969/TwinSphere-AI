@@ -32,8 +32,8 @@ from app.services.state import TwinState, get_state
 
 client = TestClient(app)
 ADMIN = {"Authorization": f"Bearer {create_token('u_admin', 'admin', 'ADMIN')}"}
-OPERATOR = {"Authorization": f"Bearer {create_token('u_op', 'operator', 'OPERATOR')}"}
-VIEWER = {"Authorization": f"Bearer {create_token('u_view', 'viewer', 'VIEWER')}"}
+OPERATOR = {"Authorization": f"Bearer {create_token('u_operator', 'operator', 'OPERATOR')}"}
+VIEWER = {"Authorization": f"Bearer {create_token('u_viewer', 'viewer', 'VIEWER')}"}
 
 
 @pytest.fixture()

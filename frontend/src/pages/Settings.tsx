@@ -35,6 +35,7 @@ export default function Settings() {
   const pushToast = useTwinStore((s) => s.pushToast);
   const handleApiError = useTwinStore((s) => s.handleApiError);
   const logout = useTwinStore((s) => s.logout);
+  const changePassword = useTwinStore((s) => s.changePassword);
 
   const [settings, setSettings] = useState<SettingsData | null>(null);
   const [status, setStatus] = useState<SystemStatus | null>(null);
@@ -42,6 +43,9 @@ export default function Settings() {
   const [interval_, setInterval_] = useState(2);
   const [busy, setBusy] = useState(false);
   const [resetArmed, setResetArmed] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN';
 
@@ -92,6 +96,22 @@ export default function Settings() {
     }
   };
 
+  // Phase 10 §11 — change own password (server revokes all sessions + re-issues token)
+  const submitPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setPwBusy(true);
+    try {
+      await changePassword(pwCurrent, pwNew);
+      pushToast('success', 'PASSWORD CHANGED', 'All previous sessions were signed out.');
+      setPwCurrent('');
+      setPwNew('');
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setPwBusy(false);
+    }
+  };
+
   const tone = (ok: boolean | string) =>
     ok === true || ok === 'ok' ? 'text-emerald-400' : ok === false ? 'text-red-400' : 'text-amber-300';
 
@@ -117,12 +137,37 @@ export default function Settings() {
             <div className="flex justify-between"><span className="text-mist-400">Role</span><b>{user?.role}</b></div>
             <div className="flex justify-between"><span className="text-mist-400">Permissions</span>
               <span className="num text-[11.5px] text-mist-300 text-right">
-                {user?.role === 'ADMIN' ? 'read simulate analyze manage apply'
-                  : user?.role === 'OPERATOR' ? 'read simulate apply'
-                    : user?.role === 'ANALYST' ? 'read analyze' : 'read'}
+                {user?.role === 'ADMIN' ? 'read simulate analyze apply export reset audit manage'
+                  : user?.role === 'OPERATOR' ? 'read simulate apply export reset audit'
+                    : user?.role === 'ANALYST' ? 'read analyze export' : 'read'}
               </span>
             </div>
           </div>
+
+          <form onSubmit={submitPassword} className="mt-4 pt-3 border-t border-line/60 space-y-2"
+                data-testid="change-password-form">
+            <div className="label-cap">Change password (min 8 chars)</div>
+            <input
+              type="password" autoComplete="current-password" required
+              placeholder="Current password"
+              className="w-full rounded-md bg-ink-900 border border-line px-3 py-2 text-[13px] outline-none focus:border-brand-500"
+              value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)}
+            />
+            <input
+              type="password" autoComplete="new-password" required minLength={8} maxLength={128}
+              placeholder="New password"
+              className="w-full rounded-md bg-ink-900 border border-line px-3 py-2 text-[13px] outline-none focus:border-brand-500"
+              value={pwNew} onChange={(e) => setPwNew(e.target.value)}
+            />
+            <button className="btn w-full" disabled={pwBusy} type="submit"
+                    data-testid="change-password-submit">
+              {pwBusy ? 'Updating…' : 'Change password'}
+            </button>
+            <p className="text-[10.5px] text-mist-500">
+              Changing your password signs out every other session for this account.
+            </p>
+          </form>
+
           <button className="btn w-full mt-4" onClick={logout}>Sign out</button>
         </div>
 

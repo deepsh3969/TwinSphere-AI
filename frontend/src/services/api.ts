@@ -1,18 +1,21 @@
 import type {
   ActiveSim, AIEventsResponse, AnalystReport, AnomaliesResponse, Anomaly,
-  AiAnalyticsResponse, BuildingsAnalyticsResponse, BuildingAnalyticsDetailResponse,
+  AiAnalyticsResponse, AuditListResponse, BuildingsAnalyticsResponse,
+  BuildingAnalyticsDetailResponse,
   BuildingsCompareResponse, BuildingDetail, BuildingEvacuationPlan,
-  CampusHealthResponse, EnergyAnalyticsResponse, EmergencyRoutesResponse,
+  CampusHealthResponse, DemoAccountsResponse, EnergyAnalyticsResponse,
+  EmergencyRoutesResponse,
   EnvironmentAnalyticsResponse, EvacuationOverview, EvacuationStatus, Floor,
   FloorDetail, Incident, IncidentDetailResponse, IncidentListResponse,
   IncidentReportResponse, OccupancyAnalyticsResponse, OverviewResponse,
   Prediction, PredictionsResponse,
   RealtimeStatus, Recommendation, ReplayFrame, ReplayPayload, RiskAnalyticsResponse,
-  RiskResponse, RiskResult, RouteAlternativesResponse, RouteGraphInfo,
+  RiskResponse, RiskResult, Role, RouteAlternativesResponse, RouteGraphInfo,
   RouteHistoryRow, RouteMode, RoutePlan, RoutesAnalyticsResponse, Sensor,
   SensorHealthDetailResponse, SensorHealthResponse, SensorHistory, SimHistoryItem,
   SimulationCompareResponse, SimulationDetailResponse, SimulationEventsResponse,
   SimulationListResponse, SimulationResults, Snapshot, SystemStatusResponse, User,
+  UserListResponse, UserProfile,
   WhatChangedResponse, Zone, ZoneDetail,
 } from '../types';
 
@@ -20,10 +23,35 @@ const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** Seconds from the Retry-After header on 429 responses (Phase 10 §13). */
+  retryAfter?: number;
+  constructor(status: number, message: string, retryAfter?: number) {
     super(message);
     this.status = status;
+    this.retryAfter = retryAfter;
   }
+}
+
+/** Friendly fallback messages for the auth/rate-limit statuses (§24.10/§13). */
+function statusMessage(status: number, detail: string | undefined,
+                       retryAfter: number | null): string {
+  if (detail) return detail;
+  if (status === 401) return 'Session expired — please sign in again';
+  if (status === 403) return 'Access denied — your role does not permit this action';
+  if (status === 429) {
+    return `Too many requests — retry in ${retryAfter && retryAfter > 0 ? `${retryAfter}s` : 'a moment'}`;
+  }
+  return `Request failed (${status})`;
+}
+
+function parseError(res: Response, text: string): ApiError {
+  let detail: string | undefined;
+  try {
+    detail = (JSON.parse(text) as { detail?: string }).detail;
+  } catch { /* non-JSON body — fall back to the status message */ }
+  const retryHeader = Number(res.headers.get('retry-after'));
+  const retryAfter = Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : undefined;
+  return new ApiError(res.status, statusMessage(res.status, detail, retryAfter ?? null), retryAfter);
 }
 
 export function getToken(): string | null {
@@ -54,11 +82,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(401, 'Session expired — please sign in again');
   }
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    throw new ApiError(res.status, (data as { detail?: string }).detail ?? `Request failed (${res.status})`);
-  }
-  return data as T;
+  if (!res.ok) throw parseError(res, text);
+  return (text ? JSON.parse(text) : {}) as T;
 }
 
 /** Strip empty values from query params (shared by Phase 5 AI filters). */
@@ -88,13 +113,7 @@ async function requestText(path: string): Promise<string> {
     throw new ApiError(401, 'Session expired — please sign in again');
   }
   const text = await res.text();
-  if (!res.ok) {
-    let detail = `Request failed (${res.status})`;
-    try {
-      detail = (JSON.parse(text) as { detail?: string }).detail ?? detail;
-    } catch { /* not JSON — keep generic message */ }
-    throw new ApiError(res.status, detail);
-  }
+  if (!res.ok) throw parseError(res, text);
   return text;
 }
 
@@ -109,6 +128,38 @@ export const api = {
     request<{ access_token: string; user: User }>('/api/auth/register', {
       method: 'POST', body: JSON.stringify({ username, email, password, role }),
     }),
+
+  // Phase 10 §5 — auth lifecycle (logout, profile, password change)
+  logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
+  me: () => request<UserProfile>('/api/auth/me'),
+  changePassword: (current_password: string, new_password: string) =>
+    request<{ ok: boolean; access_token: string; token_type: string }>(
+      '/api/auth/change-password', {
+        method: 'POST', body: JSON.stringify({ current_password, new_password }),
+      }),
+  demoAccounts: () => request<DemoAccountsResponse>('/api/auth/demo'),
+
+  // Phase 10 §17 — ADMIN user administration (manage permission)
+  listUsers: (params?: { q?: string; role?: string; active?: boolean;
+                         page?: number; page_size?: number }) =>
+    request<UserListResponse>(`/api/users${query(params as Record<string, string | number | undefined>)}`),
+  createUser: (body: { username: string; email: string; password: string; role: Role }) =>
+    request<{ user: UserProfile }>('/api/users', { method: 'POST', body: JSON.stringify(body) }),
+  updateUser: (id: string, patch: { role?: Role; is_active?: boolean }) =>
+    request<{ user: UserProfile; active_admins: number }>(
+      `/api/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  resetUserPassword: (id: string, password?: string) =>
+    request<{ ok: boolean; temporary_password: string; user: UserProfile }>(
+      `/api/users/${encodeURIComponent(id)}/reset-password${query({ password })}`,
+      { method: 'POST' }),
+
+  // Phase 10 §15 — read-only audit trail (audit permission)
+  auditLogs: (params?: { q?: string; actor?: string; action?: string; outcome?: string;
+                         entity_id?: string; start?: string; end?: string;
+                         page?: number; page_size?: number }) =>
+    request<AuditListResponse>(`/api/audit${query(params as Record<string, string | number | undefined>)}`),
+  auditActions: () =>
+    request<{ actions: string[]; actors: string[]; outcomes: string[] }>('/api/audit/actions'),
 
   campus: () => request<Snapshot>('/api/campus'),
   buildings: (params?: { type?: string; status?: string }) => {

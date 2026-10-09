@@ -239,6 +239,12 @@ def list_roads(principal: dict = Depends(require("read"))):
 def get_routes(recompute: bool = False, principal: dict = Depends(require("read"))):
     state = get_state()
     if recompute:
+        # Phase 10 §7: a GET that mutates route state needs `apply`, not `read`
+        # (VIEWER must never trigger recomputation via a query parameter).
+        from app.core.security import has_permission
+
+        if not has_permission(principal, "apply"):
+            raise HTTPException(403, f"Role {principal.get('role', 'VIEWER')} lacks 'apply' permission")
         compute_routes(state, primary_building=state.active_sim.target_id if state.active_sim else None)
     return {"routes": state.routes, "report": route_report(state)}
 

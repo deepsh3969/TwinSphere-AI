@@ -15,6 +15,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.core.security import require
 from app.models.entities import Incident, SensorReading, Simulation
 from app.services import analytics_service as analytics
@@ -310,7 +311,8 @@ def analytics_what_changed(ago: int = Query(60, le=10080),
 def analytics_export(kind: str = Query("summary"),
                      range: str = Query("24H"), start: str | None = Query(None),
                      end: str | None = Query(None), format: str = Query("csv"),
-                     principal: dict = Depends(require("read")),
+                     _: None = Depends(limit("export")),
+                     principal: dict = Depends(require("export")),
                      db: Session = Depends(get_db)):
     """CSV/JSON export of an analytics dataset (§33)."""
     kind = kind.lower()

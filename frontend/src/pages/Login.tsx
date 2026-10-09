@@ -1,15 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTwinStore } from '../store/useTwinStore';
+import { api } from '../services/api';
+import type { DemoAccountsResponse } from '../types';
 import { IconAlert, IconCube, IconX } from '../components/Icons';
-
-const DEMO_USERS = [
-  { username: 'admin', password: 'admin123', role: 'ADMIN', desc: 'Full access' },
-  { username: 'operator', password: 'operator123', role: 'OPERATOR', desc: 'Run simulations' },
-  { username: 'analyst', password: 'analyst123', role: 'ANALYST', desc: 'Analytics + AI' },
-  { username: 'viewer', password: 'viewer123', role: 'VIEWER', desc: 'Read-only' },
-];
 
 export default function Login() {
   const token = useTwinStore((s) => s.token);
@@ -19,7 +14,18 @@ export default function Login() {
   const backendOffline = useTwinStore((s) => s.backendOffline);
   const [username, setUsername] = useState('operator');
   const [password, setPassword] = useState('operator123');
+  const [demo, setDemo] = useState<DemoAccountsResponse | null>(null);
   const navigate = useNavigate();
+
+  // Phase 10 §6/§23 — demo accounts come from the server (never hardcoded
+  // credentials in the bundle); the endpoint exposes usernames/roles only.
+  useEffect(() => {
+    let alive = true;
+    api.demoAccounts()
+      .then((d) => { if (alive) setDemo(d); })
+      .catch(() => { /* demo list is optional */ });
+    return () => { alive = false; };
+  }, []);
 
   if (token) return <Navigate to="/dashboard" replace />;
 
@@ -32,6 +38,8 @@ export default function Login() {
       /* error surfaced via store */
     }
   };
+
+  const demoUsers = demo?.enabled ? demo.users : [];
 
   return (
     <div className="min-h-screen bg-ink-950 flex items-center justify-center px-4 relative overflow-hidden">
@@ -91,22 +99,32 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-5 pt-4 border-t border-line">
-            <div className="label-cap mb-2">Demo accounts (click to fill)</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {DEMO_USERS.map((u) => (
-                <button
-                  key={u.username}
-                  type="button"
-                  className="text-left rounded-md border border-line bg-ink-850 hover:border-brand-500 px-2.5 py-1.5 transition-colors"
-                  onClick={() => { setUsername(u.username); setPassword(u.password); }}
-                >
-                  <div className="text-[11.5px] font-semibold">{u.username}</div>
-                  <div className="text-[10px] text-mist-500">{u.role} · {u.desc}</div>
-                </button>
-              ))}
+          {demoUsers.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-line">
+              <div className="flex items-center justify-between mb-2">
+                <div className="label-cap">Demo accounts (click to fill)</div>
+                <span className="chip border-amber-800 bg-amber-950/60 text-amber-300 !text-[9.5px]">
+                  DEMO — local development
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {demoUsers.map((u) => (
+                  <button
+                    key={u.username}
+                    type="button"
+                    className="text-left rounded-md border border-line bg-ink-850 hover:border-brand-500 px-2.5 py-1.5 transition-colors"
+                    onClick={() => { setUsername(u.username); setPassword(''); }}
+                  >
+                    <div className="text-[11.5px] font-semibold">{u.username}</div>
+                    <div className="text-[10px] text-mist-500">{u.role} · {u.desc}</div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10.5px] text-mist-500 mt-2">
+                Seeded demo passwords are documented in README.md — never used in production.
+              </p>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="mt-4 text-center text-[12px] text-mist-500 flex items-center justify-center gap-2">

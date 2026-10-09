@@ -9,6 +9,9 @@ const m = vi.hoisted(() => ({
   api: {
     login: vi.fn(),
     register: vi.fn(),
+    logout: vi.fn(),
+    me: vi.fn(),
+    changePassword: vi.fn(),
     health: vi.fn(),
     campus: vi.fn(),
     simulations: vi.fn(),
@@ -441,7 +444,8 @@ describe('Phase 4 â€” realtime controls', () => {
     m.api.realtimeAction.mockRejectedValue(new ApiError(403, 'forbidden'));
     await useTwinStore.getState().realtimeAction('pause');
     expect(useTwinStore.getState().realtimeBusy).toBe(false);
-    expect(useTwinStore.getState().toast?.level).toBe('error');
+    // Phase 10: 403 renders as a dedicated ACCESS DENIED warning toast
+    expect(useTwinStore.getState().toast).toMatchObject({ level: 'warn', title: 'ACCESS DENIED' });
     expect(useTwinStore.getState().liveLog.length).toBe(0);
   });
 });
@@ -662,5 +666,74 @@ describe('Phase 6 â€” simulation.* WS events', () => {
     useTwinStore.setState({ snapshot: makeSnapshot({ active_sim: makeActiveSim({ t: 5 }) }) });
     useTwinStore.getState().onSocketMessage({ type: 'simulation.tick', data: {} });
     expect(useTwinStore.getState().snapshot?.active_sim?.t).toBe(5);
+  });
+});
+
+describe('Phase 10 — session security', () => {
+  it('logout revokes the token server-side and clears the session', async () => {
+    m.api.logout.mockResolvedValue({ ok: true });
+    useTwinStore.setState({
+      token: 'live-token',
+      user: { id: 'u_admin', username: 'admin', role: 'ADMIN' },
+      snapshot: makeSnapshot(),
+      connection: 'CONNECTED',
+    });
+    useTwinStore.getState().logout();
+    expect(m.api.logout).toHaveBeenCalledTimes(1);
+    expect(m.setToken).toHaveBeenCalledWith(null);
+    const st = useTwinStore.getState();
+    expect(st.token).toBeNull();
+    expect(st.user).toBeNull();
+    expect(st.snapshot).toBeNull();
+    expect(st.connection).toBe('OFFLINE');
+  });
+
+  it('logout still clears everything when the revocation call fails', () => {
+    m.api.logout.mockRejectedValue(new Error('network down'));
+    useTwinStore.setState({ token: 'live-token', user: { id: 'u_x', username: 'x', role: 'VIEWER' } });
+    expect(() => useTwinStore.getState().logout()).not.toThrow();
+    expect(useTwinStore.getState().token).toBeNull();
+    expect(useTwinStore.getState().user).toBeNull();
+  });
+
+  it('logout with no token does not call the server', () => {
+    useTwinStore.setState({ token: null });
+    useTwinStore.getState().logout();
+    expect(m.api.logout).not.toHaveBeenCalled();
+  });
+
+  it('changePassword stores the freshly issued token', async () => {
+    m.api.changePassword.mockResolvedValue({ ok: true, access_token: 'brand-new' });
+    useTwinStore.setState({ token: 'old-token' });
+    await useTwinStore.getState().changePassword('OldPass123', 'NewPass123');
+    expect(m.api.changePassword).toHaveBeenCalledWith('OldPass123', 'NewPass123');
+    expect(m.setToken).toHaveBeenCalledWith('brand-new');
+    expect(useTwinStore.getState().token).toBe('brand-new');
+  });
+
+  it('changePassword propagates validation failures without touching the session', async () => {
+    const { ApiError } = await import('../services/api');
+    m.api.changePassword.mockRejectedValue(new ApiError(400, 'Current password is incorrect'));
+    useTwinStore.setState({ token: 'old-token' });
+    await expect(useTwinStore.getState().changePassword('wrong', 'whatever1'))
+      .rejects.toMatchObject({ status: 400 });
+    expect(useTwinStore.getState().token).toBe('old-token');
+    expect(m.setToken).not.toHaveBeenCalledWith('brand-new');
+  });
+
+  it('handleApiError renders rate limiting (429) as a warn toast', async () => {
+    const { ApiError } = await import('../services/api');
+    useTwinStore.getState().handleApiError(new ApiError(429, 'Too many requests — retry in 12s'));
+    expect(useTwinStore.getState().toast).toMatchObject({
+      level: 'warn', title: 'RATE LIMITED',
+    });
+  });
+
+  it('handleApiError renders forbidden (403) as an access-denied warn toast', async () => {
+    const { ApiError } = await import('../services/api');
+    useTwinStore.getState().handleApiError(new ApiError(403, 'Access denied — your role does not permit this action'));
+    expect(useTwinStore.getState().toast).toMatchObject({
+      level: 'warn', title: 'ACCESS DENIED',
+    });
   });
 });

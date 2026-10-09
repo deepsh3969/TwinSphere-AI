@@ -18,7 +18,7 @@ ADMIN = {"Authorization": f"Bearer {create_token('u_admin', 'admin', 'ADMIN')}"}
 
 
 def _viewer() -> dict:
-    return {"Authorization": f"Bearer {create_token('u_view', 'viewer', 'VIEWER')}"}
+    return {"Authorization": f"Bearer {create_token('u_viewer', 'viewer', 'VIEWER')}"}
 
 
 # ------------------------------------------------------------ §60.1 windows

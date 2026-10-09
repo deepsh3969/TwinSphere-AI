@@ -47,6 +47,8 @@ export class TwinSocket {
   private silentTimer: number | null = null;
   private pingTimer: number | null = null;
   private stopped = false;
+  /** Token used for the current connection — detects session renewal (§11). */
+  private authToken: string | null = null;
   status: ConnectionStatus = 'OFFLINE';
 
   constructor(
@@ -54,13 +56,12 @@ export class TwinSocket {
     private onMessage: MessageHandler,
   ) {}
 
+  /** Phase 10 §22 — never put the token in the URL (server refuses query
+   * tokens); it is sent as the first authenticated frame after connect. */
   private resolveUrl(): string {
-    const token = localStorage.getItem('ts_token');
-    if (WS_BASE) {
-      return `${WS_BASE}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    }
+    if (WS_BASE) return WS_BASE;
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    return `${proto}://${window.location.host}/ws`;
   }
 
   connect() {
@@ -76,6 +77,20 @@ export class TwinSocket {
 
     this.ws.onopen = () => {
       this.retries = 0;
+      const token = localStorage.getItem('ts_token');
+      this.authToken = token;
+      if (!token) {
+        // no session → the server would close us at the auth timeout anyway
+        try { this.ws?.close(); } catch { /* noop */ }
+        return;
+      }
+      try {
+        this.ws?.send(JSON.stringify({ type: 'auth', token }));
+      } catch {
+        this.setStatus('OFFLINE');
+        this.scheduleReconnect();
+        return;
+      }
       this.setStatus('CONNECTED');
       this.armSilenceTimer();
       this.startPing();
@@ -90,10 +105,24 @@ export class TwinSocket {
         /* ignore malformed frames */
       }
     };
-    this.ws.onclose = () => {
+    this.ws.onclose = (ev) => {
       this.ws = null;
       this.stopPing();
       if (this.stopped) return;
+      if (ev.code === 4401) {
+        const current = localStorage.getItem('ts_token');
+        if (current && current !== this.authToken) {
+          // session renewed (password change) → reconnect with the new token
+          this.setStatus('OFFLINE');
+          this.retries = 0;
+          this.scheduleReconnect();
+          return;
+        }
+        // session revoked/expired server-side → force the app to sign out
+        this.setStatus('OFFLINE');
+        window.dispatchEvent(new CustomEvent('ts:unauthorized'));
+        return;
+      }
       this.setStatus('OFFLINE');
       this.scheduleReconnect();
     };

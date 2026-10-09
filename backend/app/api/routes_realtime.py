@@ -96,7 +96,7 @@ async def resume(principal: dict = Depends(require("simulate")), db: Session = D
 
 
 @router.post("/reset")
-async def reset(principal: dict = Depends(require("simulate")), db: Session = Depends(get_db)):
+async def reset(principal: dict = Depends(require("reset")), db: Session = Depends(get_db)):
     state = get_state()
     sensor_engine.reset_telemetry(state)
     state.sim_status = SIM_STATUS_PAUSED

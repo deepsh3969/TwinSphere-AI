@@ -109,8 +109,11 @@ def main() -> int:
         login = client.post("/api/auth/login",
                             json={"username": "operator", "password": "operator123"})
         ohdr = {"Authorization": f"Bearer {login.json().get('access_token')}"}
+        otok = login.json().get("access_token")
         try:
             with client.websocket_connect("/ws") as ws:
+                # Phase 10 §10 — first frame must be the auth message
+                ws.send_text(_json.dumps({"type": "auth", "token": otok}))
                 frames: list[dict] = []
 
                 _collect(ws, {"state"}, 5.0, frames)
@@ -325,6 +328,7 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             check("ws connection", False, repr(exc))
 
+        # ------------ Phase 10 §10: authentication & authorization checks ---
         rejected = False
         try:
             with client.websocket_connect("/ws?token=not-a-real-token") as ws:
@@ -335,16 +339,74 @@ def main() -> int:
                     rejected = True
         except Exception:  # noqa: BLE001
             rejected = True
-        check("ws rejects bad token", rejected)
+        check("ws refuses tokens in query string", rejected)
+
+        try:
+            with client.websocket_connect("/ws") as ws:
+                # no auth message: server waits, then closes with 4401
+                msg = ws.receive()
+                closed = isinstance(msg, dict) and msg.get("type") == "websocket.close"
+                check("ws rejects unauthenticated connection", closed, str(msg)[:120])
+        except Exception:  # noqa: BLE001
+            check("ws rejects unauthenticated connection", True)
+
+        try:
+            with client.websocket_connect("/ws") as ws:
+                ws.send_text(_json.dumps({"type": "auth", "token": "garbage"}))
+                msg = ws.receive()
+                closed = isinstance(msg, dict) and msg.get("type") == "websocket.close"
+                check("ws rejects invalid auth token", closed, str(msg)[:120])
+        except Exception:  # noqa: BLE001
+            check("ws rejects invalid auth token", True)
+
+        def _recv_until(ws, pred, limit: int = 8):
+            for _ in range(limit):
+                frame = ws.receive_json()
+                if pred(frame):
+                    return frame
+            return None
 
         try:
             r = client.post("/api/auth/login", json={"username": "viewer", "password": "viewer123"})
-            token = r.json().get("access_token")
-            with client.websocket_connect(f"/ws?token={token}") as ws:
+            vtok = r.json().get("access_token")
+            with client.websocket_connect("/ws") as ws:
+                ws.send_text(_json.dumps({"type": "auth", "token": vtok}))
                 first = ws.receive_json()
-                check("ws accepts valid token", first.get("type") == "state")
+                check("ws accepts valid auth message", first.get("type") == "state",
+                      str(first)[:120])
+                ws.send_text(_json.dumps({"type": "subscribe", "channel": "state"}))
+                sub = _recv_until(ws, lambda f: f.get("type") == "subscription")
+                check("ws viewer subscribes read channel", bool(sub and sub.get("ok")), str(sub))
+                ws.send_text(_json.dumps({"type": "subscribe", "channel": "admin"}))
+                sub2 = _recv_until(ws, lambda f: f.get("type") == "subscription")
+                check("ws viewer denied admin channel", bool(sub2) and sub2.get("ok") is False,
+                      str(sub2))
+                ws.send_text(_json.dumps({"type": "subscribe", "channel": "nope"}))
+                bad = _recv_until(ws, lambda f: f.get("type") in ("error", "subscription"))
+                check("ws unknown channel rejected",
+                      bool(bad) and bad.get("type") == "error", str(bad))
+                ws.send_text(_json.dumps({"type": "not_a_real_type"}))
+                err = _recv_until(ws, lambda f: f.get("type") == "error")
+                check("ws unknown message type rejected",
+                      bool(err) and err.get("error") == "unknown_type", str(err))
+                ws.send_text("this is not json")
+                err2 = _recv_until(ws, lambda f: f.get("type") == "error")
+                check("ws malformed json rejected",
+                      bool(err2) and err2.get("error") == "invalid_json", str(err2))
         except Exception as exc:  # noqa: BLE001
-            check("ws accepts valid token", False, repr(exc))
+            check("ws viewer auth/subscribe flow", False, repr(exc))
+
+        try:
+            r = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+            atok = r.json().get("access_token")
+            with client.websocket_connect("/ws") as ws:
+                ws.send_text(_json.dumps({"type": "auth", "token": atok}))
+                ws.receive_json()
+                ws.send_text(_json.dumps({"type": "subscribe", "channel": "admin"}))
+                sub = _recv_until(ws, lambda f: f.get("type") == "subscription")
+                check("ws admin subscribes admin channel", bool(sub and sub.get("ok")), str(sub))
+        except Exception as exc:  # noqa: BLE001
+            check("ws admin auth/subscribe flow", False, repr(exc))
 
     print(f"\n{PASSED}/{PASSED + FAILED} websocket checks passed")
     return 0 if FAILED == 0 else 1

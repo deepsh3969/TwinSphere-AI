@@ -14,6 +14,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.core.security import require
 from app.services import history_service as hs
 from app.services import replay_service as rs
@@ -69,7 +70,8 @@ def incident_report(incident_id: str, principal: dict = Depends(require("read"))
 
 @router.get("/incidents/{incident_id}/export")
 def incident_export(incident_id: str, format: str = Query("csv"),
-                    principal: dict = Depends(require("read")),
+                    _: None = Depends(limit("export")),
+                    principal: dict = Depends(require("export")),
                     db: Session = Depends(get_db)):
     report = hs.incident_report(db, incident_id)
     if report is None:
@@ -156,7 +158,8 @@ def simulation_frame(sim_id: str, t: float = Query(0.0, ge=0),
 def history_export(kind: str = Query("incidents"), range: str = Query("30D"),
                    start: str | None = Query(None), end: str | None = Query(None),
                    format: str = Query("csv"),
-                   principal: dict = Depends(require("read")),
+                   _: None = Depends(limit("export")),
+                   principal: dict = Depends(require("export")),
                    db: Session = Depends(get_db)):
     from app.services.state import get_state
     kind = (kind or "").lower()

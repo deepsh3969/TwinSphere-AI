@@ -29,6 +29,21 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), default="VIEWER")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    # Phase 10 account lifecycle
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class RevokedToken(Base):
+    """Phase 10 §18 — server-side token deny-list (logout revocation)."""
+
+    __tablename__ = "revoked_tokens"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    jti: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class Building(Base):
@@ -358,13 +373,16 @@ class AuditLog(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     action: Mapped[str] = mapped_column(String(60), index=True)
     actor: Mapped[str] = mapped_column(String(64), default="system")
-    user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     entity: Mapped[str] = mapped_column(String(60), default="")
     entity_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
     entity_id: Mapped[str | None] = mapped_column(String(60), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     detail: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    # Phase 10 §15 — structured audit extensions
+    outcome: Mapped[str] = mapped_column(String(16), default="SUCCESS", index=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
 
 class AiAnalysis(Base):

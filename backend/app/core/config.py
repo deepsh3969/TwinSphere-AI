@@ -39,10 +39,38 @@ class Settings:
     APP_NAME = "TwinSphere AI"
     VERSION = "1.0.0"
 
+    # --- Phase 10: environment / security posture -------------------------
+    APP_ENV = _env("APP_ENV", "development").strip().lower()  # development | production
+    IS_PRODUCTION = APP_ENV == "production"
+
     DATABASE_URL = _env("DATABASE_URL", f"sqlite:///{BACKEND_DIR / 'twinsphere.db'}")
     JWT_SECRET = _env("JWT_SECRET", "dev-only-change-me-in-production")
     JWT_ALGORITHM = "HS256"
     JWT_EXPIRE_MINUTES = int(_env("JWT_EXPIRE_MINUTES", "720"))
+    JWT_ISSUER = _env("JWT_ISSUER", "twinsphere")
+    JWT_AUDIENCE = _env("JWT_AUDIENCE", "twinsphere-api")
+
+    # Demo seed accounts + self-service registration: enabled in development,
+    # disabled by default in production (explicit env override required).
+    DEMO_USERS_ENABLED = _bool_env("DEMO_USERS_ENABLED", "false" if IS_PRODUCTION else "true")
+    REGISTRATION_ENABLED = _bool_env("REGISTRATION_ENABLED", "false" if IS_PRODUCTION else "true")
+
+    # Rate limiting (per category, sliding window; see app/core/ratelimit.py)
+    RATE_LIMIT_ENABLED = _bool_env("RATE_LIMIT_ENABLED", "true")
+    RATE_LIMIT_PER_MINUTE = int(_env("RATE_LIMIT_PER_MINUTE", "120"))
+    LOGIN_RATE_LIMIT_PER_MINUTE = int(_env("LOGIN_RATE_LIMIT_PER_MINUTE", "20"))
+    REGISTER_RATE_LIMIT_PER_MINUTE = int(_env("REGISTER_RATE_LIMIT_PER_MINUTE", "5"))
+    EXPORT_RATE_LIMIT_PER_MINUTE = int(_env("EXPORT_RATE_LIMIT_PER_MINUTE", "30"))
+    AI_RATE_LIMIT_PER_MINUTE = int(_env("AI_RATE_LIMIT_PER_MINUTE", "20"))
+    SIMULATION_RATE_LIMIT_PER_MINUTE = int(_env("SIMULATION_RATE_LIMIT_PER_MINUTE", "30"))
+    ADMIN_RATE_LIMIT_PER_MINUTE = int(_env("ADMIN_RATE_LIMIT_PER_MINUTE", "60"))
+    WS_RATE_LIMIT_PER_MINUTE = int(_env("WS_RATE_LIMIT_PER_MINUTE", "60"))
+    WS_AUTH_TIMEOUT_S = float(_env("WS_AUTH_TIMEOUT_S", "10"))
+
+    # Transport hardening (HSTS stays off for plain-HTTP local development)
+    HSTS_ENABLED = _bool_env("HSTS_ENABLED", "false")
+    SECURITY_HEADERS_ENABLED = _bool_env("SECURITY_HEADERS_ENABLED", "true")
+    MAX_REQUEST_BODY_BYTES = int(_env("MAX_REQUEST_BODY_BYTES", "1000000"))
 
     CORS_ORIGINS = [
         o.strip()
@@ -68,7 +96,6 @@ class Settings:
     WEBSOCKET_ENABLED = _bool_env("WEBSOCKET_ENABLED", "true")
     RANDOM_SEED = int(_env("RANDOM_SEED", "42"))
     HISTORY_RETENTION = int(_env("HISTORY_RETENTION", "5000"))
-    RATE_LIMIT_PER_MINUTE = int(_env("RATE_LIMIT_PER_MINUTE", "120"))
 
     # --- Phase 5: AI anomaly / prediction / risk intelligence --------------
     AI_ENABLED = _bool_env("AI_ENABLED", "true")
@@ -84,6 +111,46 @@ class Settings:
     MODEL_DIR = _env("MODEL_DIR", str(BASE_DIR / "ai" / "models"))
     RISK_SMOOTHING_ALPHA = float(_env("RISK_SMOOTHING_ALPHA", "0.35"))
     RISK_MIN_DELTA = float(_env("RISK_MIN_DELTA", "1.0"))
+
+
+# Development JWT secrets that must never be accepted in production.
+_DEV_SECRETS = {"dev-only-change-me-in-production", "change-me-to-a-long-random-string", "secret"}
+
+
+def validate_security_config() -> None:
+    """Fail fast on unsafe production configuration (Phase 10 §13).
+
+    Raises RuntimeError before the app serves traffic when a production
+    deployment would run with a known/default signing secret or a short one.
+    Development keeps the default secret but is expected to warn.
+    """
+    secret = settings.JWT_SECRET or ""
+    if settings.IS_PRODUCTION:
+        problems: list[str] = []
+        if secret in _DEV_SECRETS or secret.startswith("dev-"):
+            problems.append("JWT_SECRET is a known development default")
+        if len(secret) < 32:
+            problems.append("JWT_SECRET must be at least 32 characters")
+        if not problems:
+            origins = [o for o in settings.CORS_ORIGINS if o and o != "*"]
+            if not origins:
+                problems.append("CORS_ORIGINS must list explicit origins (no wildcard)")
+        if problems:
+            raise RuntimeError(
+                "Refusing to start in production: " + "; ".join(problems)
+                + ". Set JWT_SECRET (and CORS_ORIGINS) via environment variables."
+            )
+    elif secret in _DEV_SECRETS:
+        import warnings
+
+        warnings.warn(
+            "JWT_SECRET is the development default — set a unique secret before "
+            "any shared or internet-facing deployment.",
+            stacklevel=2,
+        )
+    if "*" in settings.CORS_ORIGINS:
+        # A wildcard origin with credentials is never acceptable (Phase 10 §12).
+        raise RuntimeError("CORS_ORIGINS must not contain '*' — list explicit origins.")
 
 
 settings = Settings()

@@ -6,15 +6,23 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Phase 10 §18/§19 — containers default to production posture:
+      # strong secret is REQUIRED (no dev default), demo users + self-service
+      # registration stay disabled unless you explicitly override.
+      APP_ENV: ${APP_ENV:-production}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (min 32 chars) — see .env.example}
       DATABASE_URL: ${DATABASE_URL:-sqlite:////data/twinsphere.db}
-      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-in-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost}
+      DEMO_USERS_ENABLED: ${DEMO_USERS_ENABLED:-false}
+      REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-false}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
       SENSOR_TICK_SECONDS: ${SENSOR_TICK_SECONDS:-2.0}
       SIMULATION_SPEED: ${SIMULATION_SPEED:-1.0}
     volumes:
       - twin-data:/data
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   frontend:
@@ -22,24 +30,30 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "3000:8080"
     depends_on:
       - backend
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   # Optional: start with `docker compose --profile postgres up`
-  # and DATABASE_URL=postgresql+psycopg2://twin:twin@postgres:5432/twinsphere
+  # and DATABASE_URL=postgresql+psycopg2://twin:${POSTGRES_PASSWORD}@postgres:5432/twinsphere
   postgres:
     image: postgres:16-alpine
     profiles: ["postgres"]
     environment:
       POSTGRES_USER: twin
-      POSTGRES_PASSWORD: twin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env — see .env.example}
       POSTGRES_DB: twinsphere
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # bound to loopback only — never expose the database publicly
+      - "127.0.0.1:5432:5432"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
 
 volumes:
   twin-data:

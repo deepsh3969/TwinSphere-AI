@@ -1,0 +1,24 @@
+# Build context excludes (Phase 10 §18/§21 — smaller context, no secrets in images)
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+backend/.pytest_cache
+backend/.coverage
+backend/htmlcov
+frontend/node_modules
+frontend/dist
+node_modules
+dist
+*.log
+docs
+README.md

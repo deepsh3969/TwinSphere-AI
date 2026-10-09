@@ -69,6 +69,52 @@ export interface User {
   role: Role;
 }
 
+/** Phase 10 — full safe profile projection (/api/auth/me, /api/users). */
+export interface UserProfile extends User {
+  is_active: boolean;
+  created_at?: string | null;
+  last_login_at?: string | null;
+  password_changed_at?: string | null;
+}
+
+export interface UserListResponse {
+  users: UserProfile[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  active_admins: number;
+}
+
+export interface DemoAccountsResponse {
+  enabled: boolean;
+  registration_enabled: boolean;
+  users: Array<{ username: string; role: Role; desc: string }>;
+}
+
+export interface AuditRecord {
+  id: number;
+  action: string;
+  actor: string | null;
+  user_id: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  detail: string | null;
+  outcome: string;
+  ip_address: string | null;
+  request_id: string | null;
+  created_at: string | null;
+}
+
+export interface AuditListResponse {
+  records: AuditRecord[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  scope: 'full' | 'operational';
+}
+
 export interface Building {
   id: string;
   code: string;

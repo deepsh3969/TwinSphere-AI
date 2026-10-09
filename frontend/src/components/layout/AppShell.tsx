@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTwinStore } from '../../store/useTwinStore';
 import {
   IconActivity, IconAlert, IconBrain, IconChart, IconCube, IconDashboard,
-  IconGear, IconHistory, IconMenu, IconPause, IconPlay, IconRocket, IconX,
+  IconGear, IconHistory, IconMenu, IconPause, IconPlay, IconRocket, IconUsers, IconX,
 } from '../Icons';
 import TopBar from './TopBar';
 import DemoMode from './DemoMode';
@@ -18,6 +18,20 @@ const NAV = [
   { to: '/settings', label: 'System Settings', icon: IconGear },
 ];
 
+/** Phase 10 §23 — administration entries appear only for roles that can use them. */
+function adminNav(role: string | undefined) {
+  if (role === 'ADMIN') {
+    return [
+      { to: '/admin/users', label: 'User Administration', icon: IconUsers },
+      { to: '/admin/audit', label: 'Audit Log', icon: IconHistory },
+    ];
+  }
+  if (role === 'OPERATOR') {
+    return [{ to: '/admin/audit', label: 'Audit Log', icon: IconHistory }];
+  }
+  return [];
+}
+
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -26,6 +40,8 @@ export default function AppShell() {
   const connection = useTwinStore((s) => s.connection);
   const setDemo = useTwinStore((s) => s.setDemo);
   const snapshot = useTwinStore((s) => s.snapshot);
+  const user = useTwinStore((s) => s.user);
+  const adminItems = adminNav(user?.role);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-ink-950 text-mist-100 overflow-hidden">
@@ -81,6 +97,25 @@ export default function AppShell() {
         >
           <div className="flex-1 py-2">
             {NAV.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium border-l-2 transition-colors
+                  ${isActive
+                    ? 'border-brand-400 bg-ink-800 text-white'
+                    : 'border-transparent text-mist-300 hover:text-white hover:bg-ink-850'}`
+                }
+              >
+                <item.icon width={17} height={17} className="shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </NavLink>
+            ))}
+            {adminItems.length > 0 && !collapsed && (
+              <div className="px-4 pt-4 pb-1 label-cap">Administration</div>
+            )}
+            {adminItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}

@@ -132,6 +132,10 @@ Use the in-app **DEMO MODE** button for a scripted, guided presentation flow
 (fire drill → risk rises → routes re-optimise → AI recommendation → apply → recover), with a
 one-click reset between runs.
 
+Phase 10: demo accounts and self-registration are **development conveniences** — both are
+disabled automatically under `APP_ENV=production`, `/api/auth/demo` returns usernames only
+(never passwords), and registration always creates a `VIEWER`.
+
 ---
 
 ## Feature map
@@ -146,7 +150,9 @@ one-click reset between runs.
 | `/ai` | Published (stabilised) campus risk, risk by building, predictions with honest confidence, anomalies with band/severity filters, AI events, **Operations Analyst with the Phase 8 structured brief** (severity · confidence meter · what-changed · route assessment · grounding evidence · recommendation decisions) + **analyst status pill**, mandatory AI-limitations disclaimer |
 | `/analytics` | Full analytics workspace: 15M–30D + custom windows, building/zone/metric/incident/simulation filters (**URL-persisted**), server-side aggregation (risk bands, occupancy, energy, environment, sensor health, buildings, routes, AI, campus health, incidents, simulations), building compare, **CSV export** |
 | `/history` | Historical intelligence: **Incidents \| Simulations tabs** with server-side pagination/filters (URL-persisted), incident detail drawer (timeline · metrics · **report** · CSV export), simulation detail (metrics · events · linked incidents), **two-run compare**, **Replay button → `/dashboard?replay=<simId>`** |
-| `/settings` | Clock speed, sensor tick, system health, display defaults, demo reset |
+| `/settings` | Clock speed, sensor tick, system health, display defaults, **change password**, demo reset |
+| `/admin/users` | Phase 10 — Administration: user table (search · role filter), create user, role change, enable/disable, one-time password reset (ADMIN) |
+| `/admin/audit` | Phase 10 — Audit log: action/outcome/date filters, scope badge (FULL admin / OPERATIONAL operator), request-id correlation |
 
 **Scenarios:** Fire Emergency (330 s + 130 s recovery) · Crowd Surge · Power Failure · Road Closure ·
 Extreme Temperature — each with distinct physics, incidents, recommendations and recovery behaviour.
@@ -157,7 +163,17 @@ Extreme Temperature — each with distinct physics, incidents, recommendations a
 
 ```
 GET  /health                      service + DB status
-POST /api/auth/login              JWT + role
+POST /api/auth/login              Phase 10: JWT + role (rate-limited · audited · generic 401)
+POST /api/auth/register           public self-registration → always VIEWER (gated)
+POST /api/auth/logout             revoke presented jti · GET /api/auth/me → profile
+POST /api/auth/change-password    Argon2id policy check → bumps token_version
+GET  /api/auth/demo               demo usernames+roles only (dev; disabled in production)
+GET  /api/auth/roles              role → permission map
+GET/POST /api/users               ADMIN: list (?q&role&is_active&page) · create (role whitelist)
+PATCH /api/users/{id}             ADMIN: role change · enable/disable (self-protection rules)
+POST /api/users/{id}/reset-password  ADMIN: one-time generated password (returned once)
+GET  /api/audit · /api/audit/actions  audit query (q/action/outcome/date · audit permission;
+                                   auth.*/authz.*/admin.* hidden without manage)
 GET  /api/campus                  twin snapshot + metadata · summary · data_source=SIMULATED
 GET  /api/buildings?type=&status= building list (codes · descriptions · coordinates)
 GET  /api/buildings/{id|code}     building detail (zones · sensors · exits · routes · predictions)
@@ -913,6 +929,100 @@ hand-off, Analytics URL state + export) against **captured real API responses**
 
 ---
 
+## Phase 10 — Authentication, Authorization, Security Hardening & Auditability
+
+Identity, roles, hardened auth flows, centralized RBAC, rate limiting, security headers,
+WebSocket authentication and a queryable audit trail — backend, UI, tests, docs and
+deployment posture. Full detail: [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) (audit →
+fixes → verification), [docs/SECURITY.md](docs/SECURITY.md),
+[docs/AUTHENTICATION.md](docs/AUTHENTICATION.md), [docs/RBAC.md](docs/RBAC.md),
+[docs/AUDIT_LOGGING.md](docs/AUDIT_LOGGING.md).
+
+### Roles & permissions
+
+Four roles — `ADMIN` · `OPERATOR` · `ANALYST` · `VIEWER` — with a central matrix in
+`backend/app/core/security.py` (`read · simulate · apply · analyze · export · reset ·
+audit · manage`) enforced by `require(permission)` on every protected route; denials
+return 403 and write an `authz.denied` audit row. The frontend mirrors it with
+`RequireRole` routes and role-aware navigation. Matrix + special rules →
+[docs/RBAC.md](docs/RBAC.md).
+
+### Authentication
+
+- **Argon2id** passwords (`argon2-cffi`) with legacy PBKDF2 verify + transparent rehash;
+  policy ≥8/≤128, ≠ username, not a common password.
+- Login → HS256 JWT (`sub·username·role·tv·jti·iss·aud·exp`, 12 h default); validated on
+  every request against signature, issuer, audience, expiry, **jti deny-list** and the
+  user's `token_version` (bumped on password change / role change / disable → all
+  outstanding tokens die at once).
+- Endpoints: `POST /api/auth/{login,register,logout,change-password}`, `GET /api/auth/{me,demo,roles}`;
+  admin bootstrap `python -m app.services.bootstrap_admin --username …`
+  (refuses dev secrets, prompts or `BOOTSTRAP_ADMIN_PASSWORD`).
+- Rate limits: login 20/min dual-keyed (IP + IP|username), register 5/min, exports
+  30/min, AI 20/min, simulation 30/min, admin 60/min, WS 60/min, general 120/min → 429 +
+  `Retry-After`.
+
+### Hardening
+
+- **WebSocket:** token never in the URL — first frame `{"type":"auth","token"}` within
+  `WS_AUTH_TIMEOUT_S` (4401 on bad/revoked token before any state), permission-gated
+  channels (`state`→read, `admin`→manage), 60 s revalidation, 4429/1009 backpressure.
+- **Headers/middleware:** `X-Content-Type-Options`, `X-Frame-Options: DENY`,
+  `Referrer-Policy`, `Permissions-Policy`, CSP (HTML), `X-Request-ID` correlation,
+  1 MB body cap → 413, generic 500s (no stack/SQL leaks), optional HSTS.
+- **CORS:** explicit origin list only — wildcard refused at startup; `APP_ENV=production`
+  additionally refuses dev `JWT_SECRET` defaults (compose requires `${JWT_SECRET:?…}`).
+- **Demo posture:** demo users + registration auto-disabled in production; `/api/auth/demo`
+  never returns passwords.
+
+### Audit trail & user administration
+
+`audit_logs` gains `outcome` + `request_id`; `core/audit.py` redacts
+password/token/secret fields. Actions cover `auth.*`, `authz.*`, `admin.*` and every
+control-plane mutation (`realtime.*`, `simulation.*`, `demo.*`, …). Read-only
+`GET /api/audit[/actions]` with q/action/outcome/date filters; **OPERATOR sees only the
+operational subset** (`auth.*/authz.*/admin.*` hidden). UI: **Administration → Audit Log**.
+
+**`/admin/users` (ADMIN):** search/role filter, create user (whitelisted role), role
+change, enable/disable, one-time password reset — with self-protection rules (no
+self-disable/demote stranding the last admin).
+
+### Migration
+
+`p10b4d7e1a9c6_phase10_security` — `users` gains `is_active · last_login_at ·
+password_changed_at · token_version`; new `revoked_tokens` deny-list; `audit_logs` gains
+`outcome · request_id` (indexes on action/outcome/created_at/request_id).
+
+### Frontend
+
+- `/login`: demo-chip fills usernames (passwords stay in README), clear 401/429 messages.
+- Session: boot revalidates via `GET /api/auth/me`, logout calls the API, change-password
+  swaps the token; 401 → login, 403 → `ACCESS DENIED`, 429 → `RATE LIMITED`.
+- `RequireRole` guards `/admin/*`; Administration nav only for ADMIN/OPERATOR.
+
+### Phase 10 tests
+
+```powershell
+cd backend
+.venv\Scripts\python -m pytest tests -q                 # 239 passed (191 + 48 Phase 10)
+.venv\Scripts\python tests\smoke_api.py                 # 192/192 (server must be running)
+.venv\Scripts\python tests\ws_check.py                  # 56/56
+
+cd frontend
+npm run typecheck && npm run build
+npm run test                                            # vitest → 193 passed (152 + 41 Phase 10)
+```
+
+Covers the auth matrix (each role × allowed/denied routes), token revocation, password
+policy/hashing, rate-limit buckets, headers/CORS/secrets validation, WS handshake +
+channel ACL, audit schema/scoping/redaction, user administration, and the frontend
+session/RBAC/403/429 handling. Dependencies re-audited: `pip_audit` → 0 runtime
+vulnerabilities (PyJWT → 2.15.0, pytest → 9); `npm audit` → 2 moderate react-router
+advisories accepted with rationale (fix = breaking v7) in
+[docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md).
+
+---
+
 ## Testing
 
 ```powershell
@@ -920,15 +1030,15 @@ hand-off, Analytics URL state + export) against **captured real API responses**
 cd backend
 $env:PYTHONPATH = (Resolve-Path ..).Path
 .venv\Scripts\python -m uvicorn app.main:app --port 8000     # terminal 1
-.venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 180/180
+.venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 192/192
 
-.venv\Scripts\python -m pytest tests -q                       # unit/integration → 191 passed
-.venv\Scripts\python tests\ws_check.py                        # WebSocket checks → 48/48
+.venv\Scripts\python -m pytest tests -q                       # unit/integration → 239 passed (48 Phase 10 security)
+.venv\Scripts\python tests\ws_check.py                        # WebSocket checks → 56/56
 
 # Frontend
 cd frontend
 npm run typecheck && npm run build
-npm run test                               # vitest: utils + store + panels + twin/AI/analyst/history/analytics/replay → 152 passed
+npm run test                               # vitest: utils + store + panels + twin/AI/analyst/history/analytics/replay/security → 193 passed
 ```
 
 ---
@@ -939,13 +1049,15 @@ npm run test                               # vitest: utils + store + panels + tw
 TwinSphere-AI/
 ├── backend/            FastAPI app: API, auth, WebSocket, runtime loop, services
 │   ├── app/{api,core,models,services,schemas,websocket}
-│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst → p9f3c8d2e7b1 analytics indexes)
-│   └── tests/          smoke_api.py · ws_check.py · pytest suite (incl. Phase 2 tests)
+│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst → p9f3c8d2e7b1 analytics indexes → p10b4d7e1a9c6 security)
+│   ├── requirements-dev.txt   Phase 10: dev/test deps split (pytest 9, pip-audit)
+│   └── tests/          smoke_api.py · ws_check.py · pytest suite (incl. Phase 2 + Phase 10 security tests)
 ├── ai/                 Deterministic + ML engines: risk, prediction, anomaly, simulation, optimization, analyst
 ├── frontend/           React 18 · Vite · Tailwind v4 · Three.js/R3F · Recharts · Zustand · Vitest
 ├── database/           (SQLite file lives in backend/ by default; this dir is for external DB artifacts)
 ├── simulation-data/    Exported campus_model.json + sensor_history.csv (generated at seed time)
 ├── docs/               architecture.md · api.md · AI_ANALYST.md · ROUTING.md · simulation.md · ANALYTICS.md · REPLAY.md
+│                       SECURITY_AUDIT.md · SECURITY.md · RBAC.md · AUTHENTICATION.md · AUDIT_LOGGING.md
 ├── docker-compose.yml  backend + frontend (+ optional postgres profile)
 └── .env.example        Environment contract
 ```
@@ -957,8 +1069,14 @@ TwinSphere-AI/
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///…/backend/twinsphere.db` | SQLAlchemy URL (SQLite or PostgreSQL) |
-| `JWT_SECRET` | `dev-only-change-me-in-production` | JWT signing secret — **change in production** |
-| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed origins |
+| `JWT_SECRET` | `dev-only-change-me-in-production` | JWT signing secret — **startup refuses dev default when `APP_ENV=production`** (compose requires it) |
+| `APP_ENV` | `development` | `production` → demo users + registration off, strict secret/CORS validation |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed origins — wildcard refused at startup |
+| `JWT_EXPIRE_MINUTES` | `720` | Access-token lifetime (Phase 10) |
+| `DEMO_USERS_ENABLED` / `REGISTRATION_ENABLED` | dev `true` / prod `false` | Phase 10 demo + self-registration gates |
+| `RATE_LIMIT_ENABLED` + `*_RATE_LIMIT_PER_MINUTE` | `true` (+ per-category) | Phase 10 limiter (login 20 · register 5 · export 30 · ai 20 · simulation 30 · admin 60 · ws 60 · general 120 per minute) |
+| `HSTS_ENABLED` / `SECURITY_HEADERS_ENABLED` | `false` / `true` | Phase 10 transport hardening (enable HSTS behind TLS) |
+| `MAX_REQUEST_BODY_BYTES` | `1000000` | Phase 10 body cap → HTTP 413 |
 | `LLM_API_KEY` / `LLM_MODEL` / `LLM_BASE_URL` | empty / `gpt-4o-mini` | Optional LLM analyst (deterministic fallback when unset) |
 | `LLM_TIMEOUT` / `LLM_MAX_TOKENS` | `12` / `900` | Phase 8 LLM call budget — on timeout/error/bad JSON the deterministic fallback answers |
 | `ANALYST_COOLDOWN_SECONDS` | `15` | Phase 8 minimum gap between triggered analyst refreshes (5 s at CRITICAL; API bypasses) |

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.audit import audit
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.core.security import require
 from app.models.entities import Simulation, SimulationEvent
 from app.schemas.common import SimulationCreate
@@ -41,6 +42,7 @@ def list_simulations(principal: dict = Depends(require("read")), db: Session = D
 
 @router.post("", status_code=201)
 def create_simulation(body: SimulationCreate, principal: dict = Depends(require("simulate")),
+                      _: None = Depends(limit("simulation")),
                       db: Session = Depends(get_db)):
     state = get_state()
     if body.target_id and body.target_id not in state.buildings and body.scenario != "road":
@@ -151,7 +153,7 @@ def resume(sim_id: str, principal: dict = Depends(require("simulate")), db: Sess
 
 
 @router.post("/{sim_id}/reset")
-def reset(sim_id: str, principal: dict = Depends(require("simulate")), db: Session = Depends(get_db)):
+def reset(sim_id: str, principal: dict = Depends(require("reset")), db: Session = Depends(get_db)):
     state = get_state()
     _sim_or_404(state, sim_id)
     try:

@@ -11,8 +11,15 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     email: str = Field(min_length=5, max_length=120)
-    password: str = Field(min_length=6, max_length=128)
-    role: Literal["ADMIN", "OPERATOR", "ANALYST", "VIEWER"] = "VIEWER"
+    password: str = Field(min_length=8, max_length=128)
+    # NOTE (Phase 10 §9): no `role` field — self-service registration can only
+    # ever create VIEWER accounts.  Privileged roles are granted via /api/users
+    # by an ADMIN.  Extra JSON fields (e.g. "role": "ADMIN") are ignored.
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class SimulationCreate(BaseModel):
@@ -68,3 +75,19 @@ class RealtimeSpeed(BaseModel):
     """Phase 4 realtime simulator speed — membership in ALLOWED_SPEEDS is
     validated in the route so every invalid value gets a helpful 400."""
     speed: float
+
+
+# ---------------------------------------------------------------- Phase 10
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+    email: str = Field(min_length=5, max_length=120)
+    password: str = Field(min_length=8, max_length=128)
+    role: Literal["ADMIN", "OPERATOR", "ANALYST", "VIEWER"] = "VIEWER"
+
+
+class UserUpdate(BaseModel):
+    """Partial update — role and/or is_active.  Never accepts password or
+    id fields (mass-assignment protection, Phase 10 §9)."""
+    role: Literal["ADMIN", "OPERATOR", "ANALYST", "VIEWER"] | None = None
+    is_active: bool | None = None

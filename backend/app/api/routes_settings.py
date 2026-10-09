@@ -59,7 +59,7 @@ def demo_script(principal: dict = Depends(require("read"))):
 
 
 @router.post("/demo/reset")
-def demo_reset(principal: dict = Depends(require("simulate")), db=Depends(get_db)):
+def demo_reset(principal: dict = Depends(require("reset")), db=Depends(get_db)):
     state = get_state()
     out = full_reset(state)
     audit(db, "demo.reset", actor=principal.get("username", "?"), detail="Demo state reset")

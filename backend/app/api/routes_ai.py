@@ -9,6 +9,7 @@ from ai.anomaly import filtered as filter_anomalies
 from app.core.audit import audit
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.core.security import require
 from app.models.entities import AiRecommendation, Incident, SystemAlert
 from app.schemas.common import (
@@ -145,6 +146,7 @@ def stored_predictions(principal: dict = Depends(require("read")), db: Session =
 
 @router.post("/ai/analyze")
 async def analyze_endpoint(body: AnalyzeRequest,
+                           _: None = Depends(limit("ai")),
                            principal: dict = Depends(require("analyze"))):
     """Phase 8 §49 — explicit analyst run. Always bypasses cache/cooldown;
     `mode` (or legacy `focus`) selects an analysis mode, `question` is

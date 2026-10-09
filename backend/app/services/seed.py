@@ -182,7 +182,10 @@ def seed_data(db: Session) -> dict:
     sensors = build_sensors()
     buildings_by_id = {b["id"]: b for b in BUILDINGS}
 
-    if fresh:
+    # Phase 10 §6: demo accounts are seeded only when explicitly enabled
+    # (development default; disabled when APP_ENV=production).  Production
+    # creates its first administrator via `python -m app.services.bootstrap_admin`.
+    if fresh and settings.DEMO_USERS_ENABLED:
         for username, email, password, role in SEED_USERS:
             db.add(User(id=f"u_{username}", username=username, email=email,
                         password_hash=hash_password(password), role=role))
