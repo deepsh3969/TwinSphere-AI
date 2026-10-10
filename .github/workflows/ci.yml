@@ -42,6 +42,7 @@ jobs:
           RATE_LIMIT_ENABLED: "false"
           APP_ENV: development
           JWT_SECRET: ci-test-secret-not-for-production-use-0123456789
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           alembic upgrade head
           nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/uvicorn.log 2>&1 &
