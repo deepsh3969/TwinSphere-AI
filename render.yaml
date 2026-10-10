@@ -31,8 +31,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        # Replace with your actual Vercel domain after the frontend is deployed.
-        value: https://twinsphere-ai.vercel.app
+        value: https://twinsphere-ai-sand.vercel.app
       - key: DEMO_USERS_ENABLED
         value: "true"
       - key: REGISTRATION_ENABLED

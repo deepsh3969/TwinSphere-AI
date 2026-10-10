@@ -18,7 +18,7 @@ road, heat) and apply AI recommendations to drive the campus back to **SYSTEM NO
 
 | Component | URL | Status |
 |-----------|-----|--------|
-| Frontend (Vercel) | https://twinsphere-ai-flax.vercel.app | **LIVE** |
+| Frontend (Vercel) | https://twinsphere-ai-sand.vercel.app | **LIVE** |
 | Backend health | _pending backend deploy_ | — |
 
 > Demo accounts are development-only (`APP_ENV=development`). In production they are disabled;
