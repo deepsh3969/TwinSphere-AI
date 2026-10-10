@@ -40,13 +40,17 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./ci_smoke.db
           RATE_LIMIT_ENABLED: "false"
+          APP_ENV: development
+          JWT_SECRET: ci-test-secret-not-for-production-use-0123456789
         run: |
-          uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          alembic upgrade head
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/uvicorn.log 2>&1 &
           SERVER_PID=$!
-          for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8000/health && break
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8000/health; then echo "server up"; break; fi
             sleep 1
           done
+          curl -sf http://127.0.0.1:8000/health || { echo "server failed to start"; cat /tmp/uvicorn.log; exit 1; }
           python tests/smoke_api.py
           python tests/ws_check.py
           kill $SERVER_PID || true
