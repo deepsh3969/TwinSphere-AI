@@ -1,0 +1,59 @@
+# TwinSphere AI — Render deployment blueprint
+#
+# This file tells Render how to run the FastAPI backend.  Create a new
+# Blueprint in the Render dashboard (New > Blueprint) and point it at this
+# repository; Render reads this file automatically.
+#
+# Before deploying, set the required environment variables in the Render
+# dashboard (Settings > Environment).  Never commit real secrets.
+
+services:
+  - type: web
+    name: twinsphere-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: >
+      pip install -r requirements.txt &&
+      python -m alembic upgrade head
+    startCommand: >
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: twinsphere-db
+          propertyName: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        # Replace with your actual Vercel domain after the frontend is deployed.
+        value: https://twinsphere-ai.vercel.app
+      - key: DEMO_USERS_ENABLED
+        value: "true"
+      - key: REGISTRATION_ENABLED
+        value: "false"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: LLM_API_KEY
+        value: ""
+      - key: SIMULATION_ENABLED
+        value: "true"
+      - key: WEBSOCKET_ENABLED
+        value: "true"
+      - key: SENSOR_TICK_SECONDS
+        value: "2.0"
+    disk:
+      name: twinsphere-data
+      mountPath: /data
+      sizeGB: 1
+
+databases:
+  - name: twinsphere-db
+    plan: free
+    databaseName: twinsphere
+    user: twin

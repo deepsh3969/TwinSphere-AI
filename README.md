@@ -1,13 +1,28 @@
 # TwinSphere AI — Smart Campus Digital Twin & Simulation Platform
 
+[![CI](https://github.com/deepsh3969/TwinSphere-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/deepsh3969/TwinSphere-AI/actions/workflows/ci.yml)
+
 An AI-powered **digital twin of a university campus**: live simulated telemetry flows through a
 sensor engine into a central twin state, out to risk / prediction / anomaly / optimisation engines,
-and into an interactive 3D scene — where operators can run what--if drills (fire, crowd, power,
+and into an interactive 3D scene — where operators can run what-if drills (fire, crowd, power,
 road, heat) and apply AI recommendations to drive the campus back to **SYSTEM NORMAL**.
 
 > **Honesty note:** every value in this platform is produced by a deterministic simulation engine
 > and is labelled **SIMULATED DATA**. The architecture is built so real IoT streams can replace the
-> simulator without touching the AI, optimisation or visualisation layers.
+> simulator without touching the AI, optimisation or visualisation layers. **No real sensors,
+> emergency services, or campus infrastructure are connected.**
+
+---
+
+## Live demo
+
+| Component | URL | Status |
+|-----------|-----|--------|
+| Frontend (Vercel) | https://twinsphere-ai-flax.vercel.app | **LIVE** |
+| Backend health | _pending backend deploy_ | — |
+
+> Demo accounts are development-only (`APP_ENV=development`). In production they are disabled;
+> an administrator is bootstrapped via `python -m app.services.bootstrap_admin`.
 
 ---
 
