@@ -1075,24 +1075,64 @@ npm run test                                            # vitest → 193 passed
 
 ---
 
+## Phase 12 — Production Readiness, Deterministic Demo & Release
+
+Full details: [docs/PHASE_12_RELEASE_AUDIT.md](docs/PHASE_12_RELEASE_AUDIT.md) · [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) · [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · [docs/OPERATIONS.md](docs/OPERATIONS.md) · [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)
+
+- **Dev launcher** — `scripts\dev.ps1`: one-command setup (venv, deps, .env, migrate, seed), two-terminal start/stop, health probe, test runner. No Docker required (SQLite default).
+- **Environment profiles** — `APP_ENV=development|test|demo|production`. Demo profile enables demo accounts, disables self-registration, relaxes login rate limits, and warns if the simulator is off. Production refuses dev/default secrets, short secrets, wildcard CORS, and missing `DATABASE_URL`.
+- **Deterministic demo** — backend `POST /api/demo/run` (single-flight, 409 on double-start) runs the scripted 13-step flow against the in-process twin state with a fixed 30×15 s virtual tick, so risk/routes/incidents are reproducible. `POST /api/demo/stop` and `POST /api/demo/reset` are idempotent; reset never deletes users, audit history, or persisted simulation rows. 13 tests cover repeatability, isolation, authz, recovery.
+- **Release verification** — `scripts\release_check.ps1`: runs git secret scan, backend pytest, fresh-DB migration, production-secret validation, frontend typecheck/tests/build, smoke, WebSocket, and load test; reports **PASSED / FAILED / SKIPPED / NOT RUN**; exits non-zero on any FAILED. Skipped checks are never counted as passed.
+- **Skipped smoke resolved** — "route detail by id" and "apply recommendation" are now covered by isolated pytest tests (`test_phase12_smoke_skips.py`). The "anomaly detail" skip is runtime-dependent (anomalies expire mid-run) and is covered by an honest `pytest.skip` when no anomalies exist.
+- **Load test** — `backend\tests\load_test.py`: stdlib-only (http.client + threads), 5 endpoints × concurrency 1,4 × 20 iterations; records p50/p95/p99, throughput, error rate. Modest defaults to avoid destabilising a dev machine.
+- **Docs** — DEMO_GUIDE, DEPLOYMENT, OPERATIONS, RELEASE_CHECKLIST, updated SECURITY_AUDIT F-22.
+
+### Phase 12 tests
+
+```powershell
+cd backend
+.venv\Scripts\python -m pytest tests -q                 # 282 passed + 1 skipped (269 + 13 Phase 12)
+.venv\Scripts\python tests\smoke_api.py                 # server must be running
+.venv\Scripts\python tests\ws_check.py                  # 60/60
+.venv\Scripts\python tests\load_test.py                 # p50/p95/p99 at concurrency 1,4
+
+cd frontend
+npm run typecheck && npm run build
+npm run test                                            # vitest → 193 passed
+
+# One-shot release verification (Windows)
+.\scripts\release_check.ps1
+```
+
+---
+
 ## Testing
 
 ```powershell
-# Backend end-to-end API suite — start the server first, or run the combined flow:
+# Quick start (recommended — one command sets up everything):
+.\scripts\dev.ps1 setup       # venv + deps + .env + migrate + seed
+.\scripts\dev.ps1 backend     # terminal 1
+.\scripts\dev.ps1 frontend    # terminal 2
+
+# Or manual two-terminal workflow:
 cd backend
 $env:PYTHONPATH = (Resolve-Path ..).Path
 .venv\Scripts\python -m uvicorn app.main:app --port 8000     # terminal 1
 .venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 191/194 (3 skipped)
 .venv\Scripts\python tests\ws_check.py                       # WebSocket checks → 60/60
 .venv\Scripts\python tests\benchmark_api.py                  # p50/p95/p99 benchmark (12 endpoints)
+.venv\Scripts\python tests\load_test.py                      # load test (concurrency 1,4)
 
-.venv\Scripts\python -m pytest tests -q                      # unit/integration → 269 passed
-#   (239 Phases 1–10 + 20 E2E + 5 concurrency + 5 metrics)
+.venv\Scripts\python -m pytest tests -q                      # unit/integration → 282 passed + 1 skipped
+#   (239 Phases 1–10 + 20 E2E + 5 concurrency + 5 metrics + 13 Phase 12)
 
 # Frontend
 cd frontend
 npm run typecheck && npm run build
 npm run test                               # vitest: utils + store + panels + twin/AI/analyst/history/analytics/replay/security → 193 passed
+
+# One-shot release verification (reports PASSED/FAILED/SKIPPED/NOT RUN)
+.\scripts\release_check.ps1
 
 # CI (GitHub Actions)
 .github/workflows/ci.yml                   # backend (pytest+smoke+ws) + frontend (typecheck+test+build) + security (pip-audit+npm-audit+gitleaks)
@@ -1106,16 +1146,18 @@ npm run test                               # vitest: utils + store + panels + tw
 TwinSphere-AI/
 ├── backend/            FastAPI app: API, auth, WebSocket, runtime loop, services
 │   ├── app/{api,core,models,services,schemas,websocket}
-│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst → p9f3c8d2e7b1 analytics indexes → p10b4d7e1a9c6 security → p11e5a7c3d8f4 reliability/perf indexes)
-│   ├── requirements-dev.txt   Phase 10: dev/test deps split (pytest 9, pip-audit)
-│   └── tests/          smoke_api.py · ws_check.py · benchmark_api.py · pytest suite (incl. Phase 2 + Phase 10 security + Phase 11 E2E/concurrency/metrics)
+│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → … → p11e5a7c3d8f4 reliability/perf indexes)
+│   ├── requirements-dev.txt   dev/test deps (pytest 9, pip-audit)
+│   └── tests/          smoke_api.py · ws_check.py · benchmark_api.py · load_test.py · pytest suite
 ├── ai/                 Deterministic + ML engines: risk, prediction, anomaly, simulation, optimization, analyst
 ├── frontend/           React 18 · Vite · Tailwind v4 · Three.js/R3F · Recharts · Zustand · Vitest
+├── scripts/            dev.ps1 (dev launcher) · release_check.ps1 (release verification)
 ├── database/           (SQLite file lives in backend/ by default; this dir is for external DB artifacts)
 ├── simulation-data/    Exported campus_model.json + sensor_history.csv (generated at seed time)
-├── docs/               architecture.md · api.md · AI_ANALYST.md · ROUTING.md · simulation.md · ANALYTICS.md · REPLAY.md
-│                       SECURITY_AUDIT.md · SECURITY.md · RBAC.md · AUTHENTICATION.md · AUDIT_LOGGING.md
-│                       PHASE_11_TESTING.md · PERFORMANCE.md
+├── docs/               architecture · api · AI_ANALYST · ROUTING · simulation · ANALYTICS · REPLAY
+│                       SECURITY_AUDIT · SECURITY · RBAC · AUTHENTICATION · AUDIT_LOGGING
+│                       PHASE_11_TESTING · PERFORMANCE · PHASE_12_RELEASE_AUDIT
+│                       DEMO_GUIDE · DEPLOYMENT · OPERATIONS · RELEASE_CHECKLIST
 ├── .github/workflows/  ci.yml (backend + frontend + security)
 ├── docker-compose.yml  backend + frontend (+ optional postgres profile)
 └── .env.example        Environment contract

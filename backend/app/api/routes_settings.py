@@ -6,6 +6,7 @@ from app.core.security import require
 from app.schemas.common import SettingsUpdate
 from app.services import ai_service, simulation_engine as simeng
 from app.services.demo import DEMO_SCRIPT, full_reset
+from app.services import demo_runner
 from app.services.optimization_service import compute_routes
 from app.services.risk_engine import compute_risk
 from app.services.state import get_state, reset_state
@@ -58,10 +59,36 @@ def demo_script(principal: dict = Depends(require("read"))):
     return {"steps": DEMO_SCRIPT}
 
 
+@router.get("/demo/status")
+def demo_status(principal: dict = Depends(require("read"))):
+    """Phase 12 — current demo run (or idle)."""
+    return demo_runner.current_run() or {"status": "idle"}
+
+
+@router.post("/demo/run", status_code=200)
+def demo_run(principal: dict = Depends(require("reset")), db=Depends(get_db)):
+    """Phase 12 — run the scripted demo deterministically (single-flight)."""
+    try:
+        out = demo_runner.start_run(get_state())
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    audit(db, "demo.run", actor=principal.get("username", "?"),
+          detail=f"demo run {out.get('id', '?')}")
+    return out
+
+
+@router.post("/demo/stop")
+def demo_stop(principal: dict = Depends(require("reset")), db=Depends(get_db)):
+    """Phase 12 — stop the current demo run (idempotent)."""
+    out = demo_runner.stop_run()
+    audit(db, "demo.stop", actor=principal.get("username", "?"), detail="demo stopped")
+    return out
+
+
 @router.post("/demo/reset")
 def demo_reset(principal: dict = Depends(require("reset")), db=Depends(get_db)):
     state = get_state()
-    out = full_reset(state)
+    out = demo_runner.reset_demo(state)
     audit(db, "demo.reset", actor=principal.get("username", "?"), detail="Demo state reset")
     return out
 
@@ -69,6 +96,11 @@ def demo_reset(principal: dict = Depends(require("reset")), db=Depends(get_db)):
 @router.post("/demo/hard-reset")
 def demo_hard_reset(principal: dict = Depends(require("manage")), db=Depends(get_db)):
     state = reset_state()
+    # Keep the runtime loop's state reference in sync (Phase 12): after
+    # reset_state() the global state is a new object; without this the
+    # runtime would keep draining the stale queue.
+    from app.services.runtime import runtime
+    runtime.state = state
     ai_service.warm_series(state)
     from app.services.seed import load_sensor_history
     load_sensor_history(state)

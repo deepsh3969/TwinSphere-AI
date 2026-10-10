@@ -39,9 +39,16 @@ class Settings:
     APP_NAME = "TwinSphere AI"
     VERSION = "1.0.0"
 
-    # --- Phase 10: environment / security posture -------------------------
-    APP_ENV = _env("APP_ENV", "development").strip().lower()  # development | production
+    # --- Phase 12: environment profiles ---------------------------------
+    # development | test | demo | production
+    #   development  — local work; demo users + registration on; dev secret warns
+    #   test         — pytest/smoke; rate limiting off (set by conftest)
+    #   demo         — presentation: demo users on, registration off, deterministic
+    #                  seed enforced, rate limiting relaxed for repeated runs
+    #   production   — strict secret/CORS validation; demo users + registration off
+    APP_ENV = _env("APP_ENV", "development").strip().lower()
     IS_PRODUCTION = APP_ENV == "production"
+    IS_DEMO = APP_ENV == "demo"
 
     DATABASE_URL = _env("DATABASE_URL", f"sqlite:///{BACKEND_DIR / 'twinsphere.db'}")
     JWT_SECRET = _env("JWT_SECRET", "dev-only-change-me-in-production")
@@ -50,13 +57,22 @@ class Settings:
     JWT_ISSUER = _env("JWT_ISSUER", "twinsphere")
     JWT_AUDIENCE = _env("JWT_AUDIENCE", "twinsphere-api")
 
-    # Demo seed accounts + self-service registration: enabled in development,
-    # disabled by default in production (explicit env override required).
-    DEMO_USERS_ENABLED = _bool_env("DEMO_USERS_ENABLED", "false" if IS_PRODUCTION else "true")
-    REGISTRATION_ENABLED = _bool_env("REGISTRATION_ENABLED", "false" if IS_PRODUCTION else "true")
+    # Demo seed accounts + self-service registration. Production and demo
+    # profiles default them OFF; demo explicitly re-enables demo users only.
+    DEMO_USERS_ENABLED = _bool_env(
+        "DEMO_USERS_ENABLED",
+        "true" if IS_DEMO else ("false" if IS_PRODUCTION else "true"),
+    )
+    REGISTRATION_ENABLED = _bool_env(
+        "REGISTRATION_ENABLED",
+        "false" if (IS_PRODUCTION or IS_DEMO) else "true",
+    )
 
-    # Rate limiting (per category, sliding window; see app/core/ratelimit.py)
-    RATE_LIMIT_ENABLED = _bool_env("RATE_LIMIT_ENABLED", "true")
+    # Rate limiting (per category, sliding window; see app/core/ratelimit.py).
+    # Demo profile relaxes login limits so repeated presentations don't 429.
+    RATE_LIMIT_ENABLED = _bool_env(
+        "RATE_LIMIT_ENABLED", "false" if IS_DEMO else "true"
+    )
     RATE_LIMIT_PER_MINUTE = int(_env("RATE_LIMIT_PER_MINUTE", "120"))
     LOGIN_RATE_LIMIT_PER_MINUTE = int(_env("LOGIN_RATE_LIMIT_PER_MINUTE", "20"))
     REGISTER_RATE_LIMIT_PER_MINUTE = int(_env("REGISTER_RATE_LIMIT_PER_MINUTE", "5"))
@@ -118,11 +134,11 @@ _DEV_SECRETS = {"dev-only-change-me-in-production", "change-me-to-a-long-random-
 
 
 def validate_security_config() -> None:
-    """Fail fast on unsafe production configuration (Phase 10 §13).
+    """Fail fast on unsafe configuration (Phase 10 §13, Phase 12 §4).
 
-    Raises RuntimeError before the app serves traffic when a production
-    deployment would run with a known/default signing secret or a short one.
-    Development keeps the default secret but is expected to warn.
+    Production: refuses dev/default secrets, short secrets, wildcard CORS,
+    and disabled database URL.  Demo: enforces a deterministic random seed.
+    Development: warns on the default secret.
     """
     secret = settings.JWT_SECRET or ""
     if settings.IS_PRODUCTION:
@@ -131,6 +147,8 @@ def validate_security_config() -> None:
             problems.append("JWT_SECRET is a known development default")
         if len(secret) < 32:
             problems.append("JWT_SECRET must be at least 32 characters")
+        if not settings.DATABASE_URL:
+            problems.append("DATABASE_URL must be set")
         if not problems:
             origins = [o for o in settings.CORS_ORIGINS if o and o != "*"]
             if not origins:
@@ -139,6 +157,19 @@ def validate_security_config() -> None:
             raise RuntimeError(
                 "Refusing to start in production: " + "; ".join(problems)
                 + ". Set JWT_SECRET (and CORS_ORIGINS) via environment variables."
+            )
+    elif settings.IS_DEMO:
+        # Demo profile: deterministic seed is required for repeatable
+        # presentations; the default 42 is acceptable, but warn if a
+        # caller overrode RANDOM_SEED to a non-integer (already coerced)
+        # or disabled the simulator (demo needs live telemetry).
+        import warnings
+
+        if not settings.SIMULATION_ENABLED:
+            warnings.warn(
+                "APP_ENV=demo with SIMULATION_ENABLED=false — live sensor "
+                "updates will not run during the demo.",
+                stacklevel=2,
             )
     elif secret in _DEV_SECRETS:
         import warnings
