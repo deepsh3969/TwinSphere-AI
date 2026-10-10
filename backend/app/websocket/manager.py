@@ -42,6 +42,8 @@ class WSManager:
         self._last_revalidate: float = 0.0
 
     async def connect(self, ws: WebSocket, principal: dict, channels: set[str] | None = None) -> None:
+        from app.core import metrics
+
         # NOTE: the endpoint performs `ws.accept()` as part of the Phase 10
         # auth handshake — accepting again here would be a protocol error.
         async with self._lock:
@@ -49,10 +51,16 @@ class WSManager:
                 "principal": dict(principal),
                 "channels": set(channels or {"state"}),
             }
+        metrics.inc("ws.connections.total")
+        metrics.gauge("ws.connections.active", len(self.connections))
 
     async def disconnect(self, ws: WebSocket) -> None:
+        from app.core import metrics
+
         async with self._lock:
             self.connections.pop(ws, None)
+        metrics.inc("ws.disconnects.total")
+        metrics.gauge("ws.connections.active", len(self.connections))
 
     async def subscribe(self, ws: WebSocket, channel: str) -> bool:
         entry = self.connections.get(ws)

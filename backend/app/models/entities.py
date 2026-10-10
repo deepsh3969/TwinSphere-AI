@@ -214,6 +214,8 @@ class Incident(Base):
 # Phase 9: incident history filters (severity/type facets)
 Index("ix_incidents_severity", Incident.severity)
 Index("ix_incidents_kind", Incident.kind)
+# Phase 11: history facet filter + newest-first pagination (EXPLAIN QUERY PLAN)
+Index("ix_incidents_severity_started", Incident.severity, Incident.started_at)
 
 
 class Simulation(Base):
@@ -383,6 +385,13 @@ class AuditLog(Base):
     # Phase 10 §15 — structured audit extensions
     outcome: Mapped[str] = mapped_column(String(16), default="SUCCESS", index=True)
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+
+# Phase 11: audit security queries filter by action/outcome/actor then
+# paginate newest-first (EXPLAIN QUERY PLAN showed temp B-tree sorts)
+Index("ix_audit_logs_action_time", AuditLog.action, AuditLog.created_at)
+Index("ix_audit_logs_outcome_time", AuditLog.outcome, AuditLog.created_at)
+Index("ix_audit_logs_actor_time", AuditLog.actor, AuditLog.created_at)
 
 
 class AiAnalysis(Base):

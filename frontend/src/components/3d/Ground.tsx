@@ -1,8 +1,7 @@
 import { Grid } from '@react-three/drei';
 import { memo } from 'react';
-import type { Snapshot } from '../../types';
 
-function Ground({ snapshot, grid, night }: { snapshot: Snapshot; grid: boolean; night: boolean }) {
+function Ground({ grid, night }: { grid: boolean; night: boolean }) {
   const greens = [
     { x: -75, z: -12, r: 14 },
     { x: 75, z: -14, r: 12 },

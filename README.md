@@ -1023,6 +1023,58 @@ advisories accepted with rationale (fix = breaking v7) in
 
 ---
 
+## Phase 11 — Testing, Performance, Reliability & Regression Engineering
+
+Full details: [docs/PHASE_11_TESTING.md](docs/PHASE_11_TESTING.md) · [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
+
+- **Cross-phase E2E** — `tests/test_e2e_workflows.py`: 20 tests across scenarios A–F
+  covering auth → campus → 3D payload → incident → risk → AI advisory → simulation
+  lifecycle → analytics window/filters/pagination/export → deterministic replay →
+  role matrix → audit.
+- **Concurrency / TOCTOU fix** — `app/api/routes_simulations.py` gains a module-level
+  `_SIM_LOCK` serializing create-check-act and all lifecycle transitions; create guard
+  broadened to block any non-`COMPLETED` active sim. 5 concurrency tests prove no
+  double-create, no interleaved transitions, and consistent concurrent reads.
+- **Smoke determinism** — `tests/smoke_api.py` adds `skip()` helper; 5 conditional
+  sites converted; anomaly detail retries with a fresh ID; summary reports
+  `191/194 passed (3 skipped)` — deterministic across runs.
+- **WebSocket resilience** — `tests/ws_check.py` extended to 60 checks: rapid
+  connect/disconnect, reconnect after abrupt close, dual-client broadcast, double
+  subscribe idempotency.
+- **Observability** — `app/core/metrics.py`: thread-safe, key-capped (400) in-process
+  counters wired into HTTP middleware (route-template keyed), WS manager, simulation
+  lifecycle, and rate limiter. `GET /api/system/metrics` exposes uptime + counters.
+  5 tests.
+- **Benchmark** — `tests/benchmark_api.py`: repeatable p50/p95/p99 + payload sizes for
+  12 read-heavy endpoints; baseline numbers in [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+- **DB indexes** — migration `p11e5a7c3d8f4_phase11_reliability_perf.py` adds four
+  composite indexes (`audit_logs(action,outcome,actor,created_at)`,
+  `incidents(severity,started_at)`) eliminating `TEMP B-TREE` sorts on filtered+sorted
+  queries. Verified with `EXPLAIN QUERY PLAN` on the live 87 MB DB.
+- **React-router advisories** — deeper investigation: GHSA-wrjc-x8rr-h8h6 (open
+  redirect) and GHSA-337j-9hxr-rhxg (deserializeErrors injection) both
+  architecturally unreachable in this SPA (no SSR, no untrusted navigation targets).
+  Accepted with rationale (fix = breaking v7).
+- **CI** — `.github/workflows/ci.yml`: backend (pytest + smoke + ws), frontend
+  (typecheck + test + build), security (pip-audit + npm audit + gitleaks) as parallel
+  jobs. Security scans are advisory (`continue-on-error`).
+
+### Phase 11 tests
+
+```powershell
+cd backend
+.venv\Scripts\python -m pytest tests -q                 # 269 passed (239 + 20 E2E + 5 concurrency + 5 metrics)
+.venv\Scripts\python tests\smoke_api.py                 # 191/194 (3 skipped; server must be running; space runs >=60s — login rate limit)
+.venv\Scripts\python tests\ws_check.py                  # 60/60
+.venv\Scripts\python tests\benchmark_api.py             # p50/p95/p99 + payload sizes (server must be running)
+
+cd frontend
+npm run typecheck && npm run build
+npm run test                                            # vitest → 193 passed
+```
+
+---
+
 ## Testing
 
 ```powershell
@@ -1030,15 +1082,20 @@ advisories accepted with rationale (fix = breaking v7) in
 cd backend
 $env:PYTHONPATH = (Resolve-Path ..).Path
 .venv\Scripts\python -m uvicorn app.main:app --port 8000     # terminal 1
-.venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 192/192
+.venv\Scripts\python tests\smoke_api.py                      # terminal 2  → 191/194 (3 skipped)
+.venv\Scripts\python tests\ws_check.py                       # WebSocket checks → 60/60
+.venv\Scripts\python tests\benchmark_api.py                  # p50/p95/p99 benchmark (12 endpoints)
 
-.venv\Scripts\python -m pytest tests -q                       # unit/integration → 239 passed (48 Phase 10 security)
-.venv\Scripts\python tests\ws_check.py                        # WebSocket checks → 56/56
+.venv\Scripts\python -m pytest tests -q                      # unit/integration → 269 passed
+#   (239 Phases 1–10 + 20 E2E + 5 concurrency + 5 metrics)
 
 # Frontend
 cd frontend
 npm run typecheck && npm run build
 npm run test                               # vitest: utils + store + panels + twin/AI/analyst/history/analytics/replay/security → 193 passed
+
+# CI (GitHub Actions)
+.github/workflows/ci.yml                   # backend (pytest+smoke+ws) + frontend (typecheck+test+build) + security (pip-audit+npm-audit+gitleaks)
 ```
 
 ---
@@ -1049,15 +1106,17 @@ npm run test                               # vitest: utils + store + panels + tw
 TwinSphere-AI/
 ├── backend/            FastAPI app: API, auth, WebSocket, runtime loop, services
 │   ├── app/{api,core,models,services,schemas,websocket}
-│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst → p9f3c8d2e7b1 analytics indexes → p10b4d7e1a9c6 security)
+│   ├── alembic/        Alembic migrations (b3937b6fe73a baseline → p6a1c9e4d2f7 → p7c4e8b2d9f1a routes → p8d9f4b7a2c6e analyst → p9f3c8d2e7b1 analytics indexes → p10b4d7e1a9c6 security → p11e5a7c3d8f4 reliability/perf indexes)
 │   ├── requirements-dev.txt   Phase 10: dev/test deps split (pytest 9, pip-audit)
-│   └── tests/          smoke_api.py · ws_check.py · pytest suite (incl. Phase 2 + Phase 10 security tests)
+│   └── tests/          smoke_api.py · ws_check.py · benchmark_api.py · pytest suite (incl. Phase 2 + Phase 10 security + Phase 11 E2E/concurrency/metrics)
 ├── ai/                 Deterministic + ML engines: risk, prediction, anomaly, simulation, optimization, analyst
 ├── frontend/           React 18 · Vite · Tailwind v4 · Three.js/R3F · Recharts · Zustand · Vitest
 ├── database/           (SQLite file lives in backend/ by default; this dir is for external DB artifacts)
 ├── simulation-data/    Exported campus_model.json + sensor_history.csv (generated at seed time)
 ├── docs/               architecture.md · api.md · AI_ANALYST.md · ROUTING.md · simulation.md · ANALYTICS.md · REPLAY.md
 │                       SECURITY_AUDIT.md · SECURITY.md · RBAC.md · AUTHENTICATION.md · AUDIT_LOGGING.md
+│                       PHASE_11_TESTING.md · PERFORMANCE.md
+├── .github/workflows/  ci.yml (backend + frontend + security)
 ├── docker-compose.yml  backend + frontend (+ optional postgres profile)
 └── .env.example        Environment contract
 ```

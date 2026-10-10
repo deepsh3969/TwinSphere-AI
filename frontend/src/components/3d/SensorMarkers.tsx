@@ -131,7 +131,7 @@ function SensorMarkers({ snapshot }: { snapshot: Snapshot }) {
       if (poles.instanceColor) poles.instanceColor.needsUpdate = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by geoKey/emphasis
-  }, [geoKey, emphasis, sensors, basePos]);
+  }, [geoKey, emphasis]);
 
   // instance colors (written only when selection/health changes)
   useLayoutEffect(() => {
@@ -141,7 +141,7 @@ function SensorMarkers({ snapshot }: { snapshot: Snapshot }) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by colorKey
-  }, [colorKey, sensors, colorFor]);
+  }, [colorKey, colorFor]);
 
   const dynamicIdx = useMemo(
     () => sensors

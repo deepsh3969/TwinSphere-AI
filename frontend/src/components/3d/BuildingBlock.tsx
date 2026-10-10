@@ -9,7 +9,7 @@ import { levelChip, riskColor } from '../../utils/colors';
 interface Props {
   building: Building;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (id: string) => void;
   night: boolean;
   /** x-ray shell: shown when this building is inspected floor-by-floor or when the zones layer is on. */
   xray: boolean;
@@ -81,7 +81,7 @@ function BuildingBlock({ building, selected, onSelect, night, xray }: Props) {
       {/* main mass (transparent shell in x-ray inspection mode) */}
       <mesh
         position={[0, building.height / 2, 0]}
-        onClick={(e) => { e.stopPropagation(); onSelect(); }}
+        onClick={(e) => { e.stopPropagation(); onSelect(building.id); }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = 'auto'; }}
       >

@@ -329,6 +329,18 @@ export function frameAt(frames: ReplayFrame[], t: number): ReplayFrame | null {
  * Topology comes from the live base; dynamic fields are replaced strictly
  * from the frame (persisted events/risk/occupancy) — never synthesised.
  */
+// Phase 11 — persisted event list is immutable per payload; map it once so
+// per-tick snapshot rebuilds share one stable array reference.
+const replayEventsCache = new WeakMap<ReplayPayload, Array<{ t: number; kind: string; message: string }>>();
+function replayEvents(payload: ReplayPayload) {
+  let evs = replayEventsCache.get(payload);
+  if (!evs) {
+    evs = payload.events.map((e) => ({ t: e.t, kind: e.kind, message: e.message }));
+    replayEventsCache.set(payload, evs);
+  }
+  return evs;
+}
+
 function buildReplaySnapshot(base: Snapshot | null, payload: ReplayPayload,
                              t: number): Snapshot | null {
   if (!base) return null;
@@ -382,7 +394,7 @@ function buildReplaySnapshot(base: Snapshot | null, payload: ReplayPayload,
     peak_risk: sim.peak_risk,
     people_at_risk: frame.people_at_risk,
     phase: frame.last_kind.replace(/_/g, ' '),
-    events: payload.events.map((e) => ({ t: e.t, kind: e.kind, message: e.message })),
+    events: replayEvents(payload),
     recover_t: 0,
     recover_duration: sim.recovery_time_s,
   };
@@ -883,7 +895,15 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
       if (!payload?.id) return;
       const snap = get().snapshot;
       if (snap) {
-        set({ snapshot: { ...snap, active_sim: payload as ActiveSim }, lastUpdate: Date.now() });
+        // Phase 11 — mirror the live event list with a bounded window
+        // (server keeps the full history; the client only renders the tail).
+        set({
+          snapshot: {
+            ...snap,
+            active_sim: { ...payload, events: (payload.events ?? []).slice(-120) } as ActiveSim,
+          },
+          lastUpdate: Date.now(),
+        });
       }
       return;
     }
@@ -1406,6 +1426,14 @@ export const useTwinStore = create<TwinStore>((set, get) => ({
         replayPlaying: false,
         replaySnapshot: buildReplaySnapshot(st.snapshot, payload, payload.duration_s),
       });
+      return;
+    }
+    // Phase 11 — frame-rate ticks land between persisted frames (1-2s apart);
+    // only rebuild the derived snapshot when the underlying frame changes.
+    const prevFrame = frameAt(payload.frames, st.replayT);
+    const nextFrame = frameAt(payload.frames, next);
+    if (st.replaySnapshot && prevFrame && nextFrame && nextFrame === prevFrame) {
+      set({ replayT: next });
       return;
     }
     set({

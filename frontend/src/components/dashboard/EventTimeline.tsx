@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTwinStore } from '../../store/useTwinStore';
 
 const KIND_TONE: Record<string, string> = {
@@ -20,12 +21,14 @@ export default function EventTimeline({ compact = false }: { compact?: boolean }
   const timeline = useTwinStore((s) => s.timeline);
   const snapshot = useTwinStore((s) => s.snapshot);
 
-  const items = [
-    ...timeline,
-    ...(snapshot?.active_sim?.events ?? []).filter(
-      (e) => !timeline.some((t) => t.kind === e.kind && Math.abs(t.t - e.t) < 0.01),
-    ),
-  ].slice(0, compact ? 8 : 40);
+  // Phase 11 — Set-based dedupe (was O(timeline x simEvents) per render).
+  const items = useMemo(() => {
+    const seen = new Set(timeline.map((t) => `${t.kind}:${Math.round(t.t * 100)}`));
+    const extra = (snapshot?.active_sim?.events ?? []).filter(
+      (e) => !seen.has(`${e.kind}:${Math.round(e.t * 100)}`),
+    );
+    return [...timeline, ...extra].slice(0, compact ? 8 : 40);
+  }, [timeline, snapshot?.active_sim?.events, compact]);
 
   return (
     <div className="h-full flex flex-col min-h-0">

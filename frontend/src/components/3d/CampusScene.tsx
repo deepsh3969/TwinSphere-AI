@@ -140,7 +140,7 @@ export default function CampusScene({ height = 'h-full' }: { height?: string }) 
         <color attach="background" args={[bg]} />
         <SceneLighting night={toggles.night} />
 
-        <Ground snapshot={snapshot} grid={toggles.grid} night={toggles.night} />
+        <Ground grid={toggles.grid} night={toggles.night} />
         {toggles.roads && <Roads snapshot={snapshot} />}
         {toggles.roads && <Structures snapshot={snapshot} night={toggles.night} />}
         {toggles.parking && <Parking night={toggles.night} />}
@@ -151,7 +151,7 @@ export default function CampusScene({ height = 'h-full' }: { height?: string }) 
             key={b.id}
             building={b}
             selected={selectedId === b.id}
-            onSelect={() => void selectBuilding(b.id)}
+            onSelect={selectBuilding}
             night={toggles.night}
             xray={toggles.zones || (selectedId === b.id && Boolean(selectedFloorId))}
           />

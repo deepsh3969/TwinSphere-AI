@@ -1,7 +1,9 @@
-"""WebSocket verification (Phases 4, 5, 6, 7 & 8): state push, ping/pong,
+"""WebSocket verification (Phases 4, 5, 6, 7, 8 & 11): state push, ping/pong,
 typed live events, event envelopes, auth handling, AI cycle events
 (ai.anomaly, ai.prediction, risk.update), simulation/route/evacuation
-lifecycle events and analyst.* decision-support events."""
+lifecycle events, analyst.* decision-support events, and Phase 11
+resilience (rapid connect/disconnect, reconnect, multi-client fan-out,
+idempotent subscribe)."""
 from __future__ import annotations
 
 import json as _json
@@ -407,6 +409,68 @@ def main() -> int:
                 check("ws admin subscribes admin channel", bool(sub and sub.get("ok")), str(sub))
         except Exception as exc:  # noqa: BLE001
             check("ws admin auth/subscribe flow", False, repr(exc))
+
+        # ---------------- Phase 11 §7: resilience & fan-out -------------------
+        r = client.post("/api/auth/login", json={"username": "operator",
+                                                 "password": "operator123"})
+        otok2 = r.json().get("access_token")
+
+        try:
+            for _ in range(8):  # rapid connect → auth → close cycles
+                with client.websocket_connect("/ws") as ws:
+                    ws.send_text(_json.dumps({"type": "auth", "token": otok2}))
+                    frame = ws.receive_json()
+                    assert frame.get("type") == "state", str(frame)[:120]
+            check("ws rapid connect/disconnect cycles", True)
+        except Exception as exc:  # noqa: BLE001
+            check("ws rapid connect/disconnect cycles", False, repr(exc))
+
+        try:
+            # abrupt close (context exit without goodbye), then reconnect
+            with client.websocket_connect("/ws") as ws:
+                ws.send_text(_json.dumps({"type": "auth", "token": otok2}))
+                ws.receive_json()
+            with client.websocket_connect("/ws") as ws:
+                ws.send_text(_json.dumps({"type": "auth", "token": otok2}))
+                frame = ws.receive_json()
+                check("ws reconnect after abrupt close", frame.get("type") == "state",
+                      str(frame)[:120])
+        except Exception as exc:  # noqa: BLE001
+            check("ws reconnect after abrupt close", False, repr(exc))
+
+        try:
+            with client.websocket_connect("/ws") as ws1:
+                with client.websocket_connect("/ws") as ws2:
+                    ws1.send_text(_json.dumps({"type": "auth", "token": otok2}))
+                    ws2.send_text(_json.dumps({"type": "auth", "token": otok2}))
+                    ws1.receive_json()
+                    ws2.receive_json()
+                    f1: list[dict] = []
+                    f2: list[dict] = []
+                    _drain(ws1, 8.0, f1,
+                           until=lambda fs: any(x.get("type") == "state" for x in fs))
+                    _drain(ws2, 8.0, f2,
+                           until=lambda fs: any(x.get("type") == "state" for x in fs))
+                    check("ws both clients receive broadcast",
+                          any(x.get("type") == "state" for x in f1)
+                          and any(x.get("type") == "state" for x in f2),
+                          f"frames={len(f1)}/{len(f2)}")
+        except Exception as exc:  # noqa: BLE001
+            check("ws both clients receive broadcast", False, repr(exc))
+
+        try:
+            with client.websocket_connect("/ws") as ws:
+                ws.send_text(_json.dumps({"type": "auth", "token": otok2}))
+                ws.receive_json()
+                ws.send_text(_json.dumps({"type": "subscribe", "channel": "state"}))
+                s1 = _recv_until(ws, lambda f: f.get("type") == "subscription")
+                ws.send_text(_json.dumps({"type": "subscribe", "channel": "state"}))
+                s2 = _recv_until(ws, lambda f: f.get("type") == "subscription")
+                check("ws double subscribe idempotent",
+                      bool(s1 and s1.get("ok")) and bool(s2 and s2.get("ok")),
+                      str((s1, s2)))
+        except Exception as exc:  # noqa: BLE001
+            check("ws double subscribe idempotent", False, repr(exc))
 
     print(f"\n{PASSED}/{PASSED + FAILED} websocket checks passed")
     return 0 if FAILED == 0 else 1

@@ -24,8 +24,8 @@ function place(snapshot: Snapshot, zones: Zone[]): Placed[] {
 
 function FireEffect({ snapshot }: { snapshot: Snapshot }) {
   const sim = snapshot.active_sim;
-  const flamesRef = useRef<THREE.Group[]>([]);
-  const smokeRef = useRef<THREE.Group[]>([]);
+  const flamesRef = useRef<(THREE.Group | null)[]>([]);
+  const smokeRef = useRef<(THREE.Group | null)[]>([]);
   const hazardRef = useRef<THREE.Mesh>(null);
   const lightRef = useRef<THREE.PointLight>(null);
 
@@ -109,7 +109,7 @@ function FireEffect({ snapshot }: { snapshot: Snapshot }) {
           {p.zone.fire > 0.04 && (
             <group
               position={[p.x, 0, p.z]}
-              ref={(el) => { if (el) flamesRef.current[i] = el; }}
+              ref={(el) => { flamesRef.current[i] = el; }}
             >
               {[0, 1, 2].map((k) => (
                 <mesh key={k} position={[(k - 1) * 1.5, 2.1 + k * 0.4, (k % 2) * 1.1]}>
@@ -127,14 +127,14 @@ function FireEffect({ snapshot }: { snapshot: Snapshot }) {
           {/* smoke plumes */}
           <group
             position={[p.x, 0, p.z]}
-            ref={(el) => { if (el) smokeRef.current[i] = el; }}
+            ref={(el) => { smokeRef.current[i * 2] = el; }}
           >
             <mesh>
               <sphereGeometry args={[2.1, 10, 10]} />
               <meshBasicMaterial color={p.zone.fire > 0.04 ? '#57534e' : '#6b7280'} transparent opacity={0.4} />
             </mesh>
           </group>
-          <group position={[p.x + 2.5, 0, p.z - 1.5]} ref={(el) => { if (el) smokeRef.current[i + 50] = el; }}>
+          <group position={[p.x + 2.5, 0, p.z - 1.5]} ref={(el) => { smokeRef.current[i * 2 + 1] = el; }}>
             <mesh>
               <sphereGeometry args={[1.6, 9, 9]} />
               <meshBasicMaterial color="#6b7280" transparent opacity={0.3} />

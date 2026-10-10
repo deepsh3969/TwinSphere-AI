@@ -100,6 +100,14 @@ async def security_headers(request: Request, call_next):
     if content_length.isdigit() and int(content_length) > settings.MAX_REQUEST_BODY_BYTES:
         return JSONResponse(status_code=413, content={"detail": "Request body too large"})
     response = await call_next(request)
+    # Phase 11 observability — bounded counters keyed by route *template*
+    # (falls back to a coarse "unmatched" bucket) so path params cannot
+    # explode cardinality.
+    from app.core import metrics
+
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", None) or "unmatched"
+    metrics.inc(f"http.{request.method}.{route_path}.{response.status_code}")
     response.headers["X-Request-ID"] = request.state.request_id
     if settings.SECURITY_HEADERS_ENABLED:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")

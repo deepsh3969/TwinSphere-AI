@@ -63,6 +63,9 @@ def check(category: str, identity: str = "") -> None:
             _buckets[key] = bucket
         bucket[:] = [t for t in bucket if now - t < window]
         if len(bucket) >= limit:
+            from app.core import metrics
+
+            metrics.inc(f"ratelimit.{category}.blocked")
             retry = int(window - (now - bucket[0])) + 1
             raise HTTPException(
                 status.HTTP_429_TOO_MANY_REQUESTS,

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core.database import db_status
+from app.core.metrics import snapshot as metrics_snapshot
 from app.core.security import get_current_principal
 from app.services.state import get_state
 from app.services.simulation_engine import SCENARIOS
@@ -44,3 +45,9 @@ def system_status(principal: dict = Depends(get_current_principal)):
         "recovery_progress": state.recovery_progress,
         "scenarios": {k: v["label"] for k, v in SCENARIOS.items()},
     }
+
+
+@router.get("/api/system/metrics")
+def system_metrics(principal: dict = Depends(get_current_principal)):
+    """Phase 11 — safe, bounded operational counters (uptime, HTTP, ws, sim)."""
+    return metrics_snapshot()

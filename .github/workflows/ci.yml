@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+env:
+  PYTHON_VERSION: "3.11.9"
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt
+      - name: Alembic migrations (fresh DB)
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci_test.db
+        run: |
+          alembic upgrade head
+      - name: Pytest
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci_test.db
+          RATE_LIMIT_ENABLED: "false"
+          RANDOM_SEED: "7"
+        run: python -m pytest tests -q --tb=short
+      - name: Smoke + WS (live server)
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci_smoke.db
+          RATE_LIMIT_ENABLED: "false"
+        run: |
+          uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/health && break
+            sleep 1
+          done
+          python tests/smoke_api.py
+          python tests/ws_check.py
+          kill $SERVER_PID || true
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: frontend
+        run: npm test -- --run
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend deps
+        run: pip install -r backend/requirements-dev.txt
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: pip-audit (production)
+        run: pip-audit -r backend/requirements.txt || true
+      - name: npm audit (critical only)
+        working-directory: frontend
+        run: npm audit --audit-level=critical || true
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true

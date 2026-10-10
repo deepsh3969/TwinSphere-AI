@@ -1,3 +1,5 @@
+import threading
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,11 @@ from app.services import simulation_engine as simeng
 from app.services.state import get_state
 
 router = APIRouter(prefix="/api/simulations", tags=["simulations"])
+
+# Phase 11 — serializes check-then-act on the single active simulation so
+# concurrent creates can never both pass the active check (TOCTOU race) and
+# lifecycle transitions can never interleave mid-validation.
+_SIM_LOCK = threading.Lock()
 
 
 @router.get("")
@@ -47,16 +54,22 @@ def create_simulation(body: SimulationCreate, principal: dict = Depends(require(
     state = get_state()
     if body.target_id and body.target_id not in state.buildings and body.scenario != "road":
         raise HTTPException(404, "Target building not found")
-    if state.active_sim and state.active_sim.status in ("RUNNING", "PAUSED", "AWAITING_RECOVERY", "RECOVERING"):
-        raise HTTPException(409, "An active simulation is already running. "
-                                 "Please stop or recover the current simulation first.")
-    try:
-        sim = simeng.create_simulation(state, body.scenario, body.target_id, body.params,
-                                       created_by=principal.get("username", "operator"))
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    audit(db, "simulation.create", actor=principal.get("username", "?"),
-          entity=body.target_id or "", detail=body.scenario)
+    from app.core import metrics
+
+    with _SIM_LOCK:
+        if state.active_sim and state.active_sim.status != "COMPLETED":
+            metrics.inc("simulations.create.conflict")
+            raise HTTPException(409, "An active simulation is already running. "
+                                     "Please stop or recover the current simulation first.")
+        try:
+            sim = simeng.create_simulation(state, body.scenario, body.target_id, body.params,
+                                           created_by=principal.get("username", "operator"))
+        except ValueError as exc:
+            metrics.inc("simulations.create.bad_request")
+            raise HTTPException(400, str(exc))
+        audit(db, "simulation.create", actor=principal.get("username", "?"),
+              entity=body.target_id or "", detail=body.scenario)
+        metrics.inc("simulations.create.ok")
     return sim
 
 
@@ -116,64 +129,52 @@ def _sim_or_404(state, sim_id: str) -> None:
         raise HTTPException(404, "Simulation not found")
 
 
+def _lifecycle(state, sim_id: str, principal: dict, db: Session, action: str,
+               engine_fn):
+    """Phase 11 — one locked transition: validate, apply, audit atomically."""
+    from app.core import metrics
+
+    with _SIM_LOCK:
+        _sim_or_404(state, sim_id)
+        try:
+            out = engine_fn(state, sim_id)
+        except ValueError as exc:
+            metrics.inc(f"simulations.lifecycle.{action}.error")
+            raise HTTPException(400, str(exc))
+        audit(db, f"simulation.{action}", actor=principal.get("username", "?"),
+              entity=sim_id)
+        metrics.inc(f"simulations.lifecycle.{action}.ok")
+    return out
+
+
 @router.post("/{sim_id}/start")
 def start(sim_id: str, principal: dict = Depends(require("simulate")), db: Session = Depends(get_db)):
-    state = get_state()
-    _sim_or_404(state, sim_id)
-    try:
-        out = simeng.start_simulation(state, sim_id)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    audit(db, "simulation.start", actor=principal.get("username", "?"), entity=sim_id)
-    return out
+    return _lifecycle(get_state(), sim_id, principal, db, "start",
+                      simeng.start_simulation)
 
 
 @router.post("/{sim_id}/pause")
 def pause(sim_id: str, principal: dict = Depends(require("simulate")), db: Session = Depends(get_db)):
-    state = get_state()
-    _sim_or_404(state, sim_id)
-    try:
-        out = simeng.pause_simulation(state, sim_id)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    audit(db, "simulation.pause", actor=principal.get("username", "?"), entity=sim_id)
-    return out
+    return _lifecycle(get_state(), sim_id, principal, db, "pause",
+                      simeng.pause_simulation)
 
 
 @router.post("/{sim_id}/resume")
 def resume(sim_id: str, principal: dict = Depends(require("simulate")), db: Session = Depends(get_db)):
-    state = get_state()
-    _sim_or_404(state, sim_id)
-    try:
-        out = simeng.resume_simulation(state, sim_id)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    audit(db, "simulation.resume", actor=principal.get("username", "?"), entity=sim_id)
-    return out
+    return _lifecycle(get_state(), sim_id, principal, db, "resume",
+                      simeng.resume_simulation)
 
 
 @router.post("/{sim_id}/reset")
 def reset(sim_id: str, principal: dict = Depends(require("reset")), db: Session = Depends(get_db)):
-    state = get_state()
-    _sim_or_404(state, sim_id)
-    try:
-        out = simeng.reset_simulation(state, sim_id)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    audit(db, "simulation.reset", actor=principal.get("username", "?"), entity=sim_id)
-    return out
+    return _lifecycle(get_state(), sim_id, principal, db, "reset",
+                      simeng.reset_simulation)
 
 
 @router.post("/{sim_id}/recover")
 def recover(sim_id: str, principal: dict = Depends(require("simulate")), db: Session = Depends(get_db)):
-    state = get_state()
-    _sim_or_404(state, sim_id)
-    try:
-        out = simeng.recover_simulation(state, sim_id)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    audit(db, "simulation.recover", actor=principal.get("username", "?"), entity=sim_id)
-    return out
+    return _lifecycle(get_state(), sim_id, principal, db, "recover",
+                      simeng.recover_simulation)
 
 
 @router.get("/{sim_id}/events")
