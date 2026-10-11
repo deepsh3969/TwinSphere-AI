@@ -19,7 +19,8 @@ road, heat) and apply AI recommendations to drive the campus back to **SYSTEM NO
 | Component | URL | Status |
 |-----------|-----|--------|
 | Frontend (Vercel) | https://twinsphere-ai-sand.vercel.app | **LIVE** |
-| Backend health | _pending backend deploy_ | — |
+| Backend (Render) | https://twinsphere-api.onrender.com | **LIVE** |
+| Backend health | https://twinsphere-api.onrender.com/health | **LIVE** |
 
 > Demo accounts are development-only (`APP_ENV=development`). In production they are disabled;
 > an administrator is bootstrapped via `python -m app.services.bootstrap_admin`.
